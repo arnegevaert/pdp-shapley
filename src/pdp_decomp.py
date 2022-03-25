@@ -1,53 +1,89 @@
 import numpy as np
 from itertools import combinations
-from typing import List, Callable, Dict, Set
+from typing import Tuple, Callable, Dict
+from scipy.interpolate import LinearNDInterpolator, interp1d
+from tqdm import tqdm
 
 
 class PDPComponent:
-    def __init__(self, features: Set[int]) -> None:
-        self.features = features
+    def __init__(self, features: Tuple[int]) -> None:
+        self.features = sorted(features)
+        self.interpolator = None
+    
+    def compute_partial_dependence(self, x: np.ndarray, X_bg: np.ndarray, model: Callable[[np.ndarray], np.ndarray]):
+        # x: [len(self.features)]
+        # X: [n, num_features]
+        X_copy = np.copy(X_bg)
+        for i, feat in enumerate(self.features):
+            X_copy[:, feat] = x[i]
+        return np.average(model(X_copy), axis=0)
 
-    def fit(self, X: np.ndarray, subcomponents: Dict[Set[int], "PDPComponent"]):
+    def fit(self, X: np.ndarray, model: Callable[[np.ndarray], np.ndarray],
+            subcomponents: Dict[Tuple[int], "PDPComponent"], grid_res=10):
+        # X: [n, num_features]
         # Define a grid of values
+        # Meshgrid creates coordinate matrices for each feature
+        mg = np.meshgrid(*[np.linspace(np.min(X[:, feat]), np.max(X[:, feat]), grid_res) for feat in self.features])
+        # Convert coordinate matrices to a single matrix containing a row for each grid point
+        coords = np.vstack(list(map(np.ravel, mg))).transpose()
 
-        # For each grid value, get partial dependence
+        # For each grid value, get partial dependence and subtract proper subset components
+        pd = np.array([self.compute_partial_dependence(row, X, model) for row in coords]).flatten()
+        for subset, subcomponent in subcomponents.items():
+            # features are given as indices in the full feature space
+            # derive indices of pd that correspond to subcomponent features
+            relative_indices = [self.features.index(feat) for feat in subset]
 
-        # For each grid value, subtract all proper subset components
+            # subtract subcomponent from partial dependence
+            pd -= subcomponent(coords[:, relative_indices])
 
         # Fit a model on resulting values 
-        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.LinearNDInterpolator.html#scipy.interpolate.LinearNDInterpolator
-        pass
+        if np.max(pd) - np.min(pd) < 1e-5:
+            # If the partial dependence is constant, don't fit an interpolator
+            self.interpolator = lambda _: pd[0]
+        else:
+            if len(self.features) == 1:
+                self.interpolator = interp1d(coords.flatten(), pd, fill_value="extrapolate")
+            else:
+                self.interpolator = LinearNDInterpolator(coords, pd, fill_value=0)  # TODO extrapolate using nearest interpolator (create wrapper class)
 
-    def __call__(self, x: np.ndarray):
-        pass
+    def __call__(self, X: np.ndarray):
+        # X: [n, len(self.features)]
+        if self.interpolator is None:
+            raise("PDPComponent is not fitted yet")
+        return self.interpolator(X).flatten()
 
 
 class PDPDecomposition:
     def __init__(self, model: Callable[[np.ndarray], np.ndarray]) -> None:
         self.model = model
-        self.components: Dict[Set[int], PDPComponent] = {}
+        self.components: Dict[Tuple[int], PDPComponent] = {}
+        self.average = 0
 
     def fit(self, X: np.ndarray, max_dim) -> None:
         features = list(range(X.shape[1]))
+        self.average = np.average(self.model(X), axis=0)
         # Fit PDP components up to dimension max_dim
         for i in range(max_dim):
             dim = i + 1
+            print(f"Fitting {dim}-dimensional components...")
             # Get all subsets of given dimensionality
-            subsets = combinations(features, dim)
+            subsets = list(combinations(features, dim))
             # Create and fit a PDPComponent for each
-            for subset in subsets:
-                subset = set(subset)
+            for subset in tqdm(subsets):
+                subset = tuple(sorted(subset))
                 # subcomponents contains all PDPComponents for strict subsets of subset
-                subcomponents = {k: v for k, v in self.components if all([feat in subset for feat in k])}
+                subcomponents = {k: v for k, v in self.components.items() if all([feat in subset for feat in k])}
                 self.components[subset] = PDPComponent(subset)
-                self.components[subset].fit(X, subcomponents)
+                self.components[subset].fit(X, self.model, subcomponents)
     
-    def __call__(self, x: np.ndarray) -> Dict[Set[int], np.ndarray]:
-        # Evaluate PDP decomposition at x
+    def __call__(self, X: np.ndarray) -> Dict[Tuple[int], np.ndarray]:
+        # X: [n, num_features]
+        # Evaluate PDP decomposition at all rows in X
         # Returns each component function value separately
         result = {}
-        for subset, component in self.components:
-            result[subset] = component(x)
+        for subset, component in self.components.items():
+            result[subset] = component(X[:, subset]) - self.average
         return result
 
 
@@ -61,14 +97,24 @@ class PDPShapleySampler:
 
     def estimate_shapley_values(self, X):
         result = []
+        pdp_values = self.pdp_decomp(X)
+        for i in range(X.shape[1]):
+            values_i = np.zeros(X.shape[0])
+            for feature_subset, values in pdp_values.items():
+                if i in feature_subset:
+                    values_i += values / len(feature_subset)
+            result.append(values_i.reshape(-1, 1))
+        return np.hstack(result)
+
         for row in X:
             # TODO this code does not yet account for multivariate outputs
-            pdp_values = self.pdp_decomp(row)
+            pdp_values = self.pdp_decomp(row.reshape(1, -1))
             row_shapley_values = []
             for i in range(X.shape[1]):
                 value_i = 0
-                for feature_subset, value in pdp_values:
+                for feature_subset, value in pdp_values.items():
                     if i in feature_subset:
-                        value_i += value / len(feature_subset)
+                        value_i += value[0,0] / len(feature_subset)
                 row_shapley_values.append(value_i)
             result.append(row_shapley_values)
+            return result

@@ -1,7 +1,9 @@
 import shap
+from scipy.stats import spearmanr
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score
 from time import time
 from pdp_decomp import PDPShapleySampler
@@ -27,22 +29,27 @@ if __name__ == "__main__":
     X, y = shap.datasets.adult()
     X_train, X_test, y_train, y_test = train_test_split(X.values, y, test_size=0.2, random_state=42)
     knn = KNeighborsClassifier()
+    #knn = LogisticRegression()
     knn.fit(X_train, y_train)
     print("Fitting done.")
     print(f"Balanced accuracy: {balanced_accuracy_score(y_test, knn.predict(X_test)):.2f}")
     
     X_bg = np.copy(X_train)
     rng.shuffle(X_bg)
-    X_bg = X_bg[:100, :]
+    #X_bg = X_bg[:100, :]
 
-    # shap_sampling(knn.predict_proba, X_test[:3, :], X_bg)
+    sampling_values = shap_sampling(knn.predict_proba, X_test[1, :], X_bg)
+    print(sampling_values)
 
     print("Computing PDP decomposition...")
     start_t = time()
 
-    explainer = PDPShapleySampler(lambda x: knn.predict_proba(x)[:,0])
-    explainer.compute_pdp_decomp(X_bg)
-    print(explainer.pdp_decomp)
+    explainer = PDPShapleySampler(lambda x: knn.predict_proba(x)[:,0].reshape(-1, 1), X_bg[:100], max_dim=2)
+    pdp_values = explainer.estimate_shapley_values(X_test[1, :].reshape(1, -1))
+    print(pdp_values)
 
     end_t = time()
     print(f"Done in {end_t - start_t:.2f} seconds")
+
+    print(spearmanr(pdp_values[0], sampling_values[0]))
+    print(pdp_values[0].shape, sampling_values[0].shape)
