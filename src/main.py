@@ -36,7 +36,7 @@ if __name__ == "__main__":
     
     X_bg = np.copy(X_train)
     rng.shuffle(X_bg)
-    #X_bg = X_bg[:100, :]
+    X_bg = X_bg[:100, :]
 
     sampling_values = shap_sampling(knn.predict_proba, X_test[1, :], X_bg)
     print(sampling_values)
