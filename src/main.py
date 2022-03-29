@@ -15,8 +15,6 @@ def shap_sampling(model, to_explain, X_bg):
     explainer = shap.explainers.Sampling(model, X_bg)
     values = explainer.shap_values(to_explain)
     end_t = time()
-    print(to_explain.shape)
-    print(np.array(values).shape)
     print(f"Done in {end_t - start_t:.2f} seconds")
     return values
 
@@ -38,18 +36,16 @@ if __name__ == "__main__":
     rng.shuffle(X_bg)
     X_bg = X_bg[:100, :]
 
-    sampling_values = shap_sampling(knn.predict_proba, X_test[1, :], X_bg)
-    print(sampling_values)
+    #sampling_values = shap_sampling(knn.predict_proba, X_test[:3, :], X_bg)
+    #sampling_values = np.stack(sampling_values, axis=)
 
     print("Computing PDP decomposition...")
     start_t = time()
 
-    explainer = PDPShapleySampler(lambda x: knn.predict_proba(x)[:,0].reshape(-1, 1), X_bg[:100], max_dim=2)
-    pdp_values = explainer.estimate_shapley_values(X_test[1, :].reshape(1, -1))
-    print(pdp_values)
+    explainer = PDPShapleySampler(lambda x: knn.predict_proba(x), X_bg[:100], num_outputs=2, max_dim=1)
+    pdp_values = explainer.estimate_shapley_values(X_test[:3, :].reshape(1, -1))
+    print(pdp_values.shape)
+    #print(sampling_values)
 
     end_t = time()
     print(f"Done in {end_t - start_t:.2f} seconds")
-
-    print(spearmanr(pdp_values[0], sampling_values[0]))
-    print(pdp_values[0].shape, sampling_values[0].shape)
