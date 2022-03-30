@@ -38,6 +38,7 @@ if __name__ == "__main__":
 
     sampling_values = np.array(shap_sampling(knn.predict_proba, X_test[:3, :], X_bg)).transpose((1,2,0))
 
+    """
     print("Computing PDP decomposition...")
     start_t = time()
 
@@ -54,6 +55,15 @@ if __name__ == "__main__":
     print(f"Done in {end_t - start_t:.2f} seconds")
 
     print(pdp_values.shape)
+    """
+    
+    med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
+
+    explainer = shap.Explainer(knn.predict_proba, med)
+    pdp_values = explainer(X_test[:3, :]).values
+
+    print(pdp_values.shape)
+    print(sampling_values.shape)
 
     pearsons = []
     spearmans = []
