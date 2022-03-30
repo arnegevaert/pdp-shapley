@@ -3,7 +3,6 @@ from scipy.stats import spearmanr, pearsonr
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score
 from time import time
 from pdp_decomp import PDPShapleySampler
@@ -27,7 +26,6 @@ if __name__ == "__main__":
     X, y = shap.datasets.adult()
     X_train, X_test, y_train, y_test = train_test_split(X.values, y, test_size=0.2, random_state=42)
     knn = KNeighborsClassifier()
-    #knn = LogisticRegression()
     knn.fit(X_train, y_train)
     print("Fitting done.")
     print(f"Balanced accuracy: {balanced_accuracy_score(y_test, knn.predict(X_test)):.2f}")
