@@ -22,7 +22,7 @@ class PDPComponent:
             subcomponents: Dict[Tuple[int], "PDPComponent"], grid_res=10):
         if len(self.features) == 0:
             avg_output = np.average(model(X), axis=0)
-            self.interpolator = lambda _: avg_output
+            self.interpolator = lambda inp: np.tile(avg_output, (inp.shape[0], 1))
         else:
             # X: [n, num_features]
             # Define a grid of values
@@ -32,7 +32,7 @@ class PDPComponent:
             coords = np.vstack(list(map(np.ravel, mg))).transpose()
 
             # For each grid value, get partial dependence and subtract proper subset components
-            pd = np.array([self.compute_partial_dependence(row, X, model) for row in coords]).reshape(grid_res, -1)
+            pd = np.array([self.compute_partial_dependence(row, X, model) for row in coords])
             for subset, subcomponent in subcomponents.items():
                 # features are given as indices in the full feature space
                 # derive indices of pd that correspond to subcomponent features
@@ -44,7 +44,7 @@ class PDPComponent:
             # Fit a model on resulting values 
             if np.max(pd) - np.min(pd) < 1e-5:
                 # If the partial dependence is constant, don't fit an interpolator
-                self.interpolator = lambda _: pd[0]
+                self.interpolator = lambda _: np.tile(pd[0], (X.shape[0], 1))
             else:
                 if len(self.features) == 1:
                     self.interpolator = interp1d(coords.flatten(), pd, fill_value="extrapolate", axis=0)
@@ -55,8 +55,9 @@ class PDPComponent:
         # X: [n, len(self.features)]
         if self.interpolator is None:
             raise("PDPComponent is not fitted yet")
-        return self.interpolator(X).flatten()
-
+        if len(self.features) == 1:
+            return self.interpolator(X.flatten())
+        return self.interpolator(X)
 
 class PDPDecomposition:
     def __init__(self, model: Callable[[np.ndarray], np.ndarray]) -> None:
@@ -107,9 +108,11 @@ class PDPShapleySampler:
         result = []
         pdp_values = self.pdp_decomp(X)
         for i in range(X.shape[1]):
+            # [num_samples, num_outputs]
             values_i = np.zeros((X.shape[0], self.num_outputs))
             for feature_subset, values in pdp_values.items():
                 if i in feature_subset:
                     values_i += values / len(feature_subset)
-            result.append(values_i.reshape(-1, 1))
-        return np.hstack(result)
+            result.append(values_i)
+        # [num_samples, num_features, num_outputs]
+        return np.stack(result, axis=1)

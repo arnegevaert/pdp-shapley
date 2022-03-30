@@ -1,5 +1,5 @@
 import shap
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, pearsonr
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
@@ -36,16 +36,30 @@ if __name__ == "__main__":
     rng.shuffle(X_bg)
     X_bg = X_bg[:100, :]
 
-    #sampling_values = shap_sampling(knn.predict_proba, X_test[:3, :], X_bg)
-    #sampling_values = np.stack(sampling_values, axis=)
+    sampling_values = np.array(shap_sampling(knn.predict_proba, X_test[:3, :], X_bg)).transpose((1,2,0))
 
     print("Computing PDP decomposition...")
     start_t = time()
 
-    explainer = PDPShapleySampler(lambda x: knn.predict_proba(x), X_bg[:100], num_outputs=2, max_dim=1)
-    pdp_values = explainer.estimate_shapley_values(X_test[:3, :].reshape(1, -1))
-    print(pdp_values.shape)
-    #print(sampling_values)
+    explainer = PDPShapleySampler(lambda x: knn.predict_proba(x), X_bg[:100], num_outputs=2, max_dim=2)
 
     end_t = time()
     print(f"Done in {end_t - start_t:.2f} seconds")
+
+
+    print("Computing Shapley values via PDP...")
+    start_t = time()
+    pdp_values = explainer.estimate_shapley_values(X_test[:3, :])
+    end_t = time()
+    print(f"Done in {end_t - start_t:.2f} seconds")
+
+    print(pdp_values.shape)
+
+    pearsons = []
+    spearmans = []
+    for i in range(pdp_values.shape[0]):
+        for j in range(pdp_values.shape[2]):
+            pearsons.append(pearsonr(pdp_values[i, :, j], sampling_values[i, :, j])[0])
+            spearmans.append(spearmanr(pdp_values[i, :, j], sampling_values[i, :, j])[0])
+    print(f"Avg pearson correlation: {np.average(pearsons):.2f}")
+    print(f"Avg spearman correlation: {np.average(spearmans):.2f}")

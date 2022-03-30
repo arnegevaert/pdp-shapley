@@ -6,7 +6,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.metrics import balanced_accuracy_score
 from time import time
-from sklearn.inspection import partial_dependence
 
 if __name__ == "__main__":
     num_feat = 5
@@ -28,13 +27,15 @@ if __name__ == "__main__":
     print("Computing PDP decomposition...")
     start_t = time()
 
-    explainer = PDPShapleySampler(lambda x: svm.predict_proba(x)[:,0].reshape(-1, 1), X_train, max_dim=4)
-    pdp_values = explainer.estimate_shapley_values(X_test[1, :].reshape(1, -1))
+    explainer = PDPShapleySampler(svm.predict_proba, X_train, num_outputs=2, max_dim=4)
+    pdp_values = explainer.estimate_shapley_values(X_test[:3, :])
+    # Expected shape: (3, 5, 2) (samples, features, outputs)
+    print(pdp_values.shape)
 
     avg_output = np.average(svm.predict_proba(X_train)[:, 0])
-    cur_output = svm.predict_proba(X_test[1, :].reshape(1, -1))[:, 0]
+    cur_output = svm.predict_proba(X_test[0, :].reshape(1, -1))[:, 0]
     print(f"Output difference: {(cur_output - avg_output)[0]:.2f}")
-    print(f"Sum of Shapley values: {np.sum(pdp_values):.2f}")
+    print(f"Sum of Shapley values: {np.sum(pdp_values[0, :, 0]):.2f}")
 
     end_t = time()
     print(f"Done in {end_t - start_t:.2f} seconds")
