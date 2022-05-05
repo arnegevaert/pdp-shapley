@@ -1,79 +1,61 @@
 import shap
-from scipy.stats import spearmanr, pearsonr
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import balanced_accuracy_score
-from time import time
 from pdp_decomp import PDPShapleySampler
+from lib import datasets, report
+import argparse
 
 
-def get_corrs(values1: np.ndarray, values2: np.ndarray):
-    if values1.shape != values2.shape:
-        raise ValueError(f"Shapes don't match: {values1.shape}, {values2.shape}")
-    pearsons = []
-    spearmans = []
-    for i in range(values1.shape[0]):
-        for j in range(values2.shape[2]):
-            pearson = pearsonr(values1[i, :, j], values2[i, :, j])[0]
-            if not np.isnan(pearson):
-                pearsons.append(pearson)
-            spearman = spearmanr(values1[i, :, j], values2[i, :, j])[0]
-            if not np.isnan(spearman):
-                spearmans.append(spearman)
-    return np.average(pearsons), np.average(spearmans)
-
-
+_DS_DICT = {
+    "superconductor": {"name": "superconduct", "type": "regression", "num_outputs": 1},
+    "credit": {"name": "credit-g", "type": "classification", "num_outputs": 2},
+    "adult": {"type": "classification", "num_outputs": 2}
+}
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--dataset", type=str, choices=["adult"] + list(_DS_DICT.keys()), default="adult")
+    args = parser.parse_args()
+
     rng = np.random.default_rng(seed=42)
 
-    print("Fitting model...")
-    X, y = shap.datasets.adult()
-    X_train, X_test, y_train, y_test = train_test_split(X.values, y, test_size=0.2, random_state=42)
-    knn = KNeighborsClassifier()
-    knn.fit(X_train, y_train)
-    print("Fitting done.")
-    print(f"Balanced accuracy: {balanced_accuracy_score(y_test, knn.predict(X_test)):.2f}")
+    if args.dataset == "adult":
+        X_train, X_test, y_train, y_test, predict_fn = datasets.get_adult()
+    else:
+        X_train, X_test, y_train, y_test, predict_fn = datasets.get_openml(_DS_DICT[args.dataset])
+
     
     X_bg = np.copy(X_train)
     rng.shuffle(X_bg)
-    X_bg = X_bg[:100, :]
+    X_bg = X_bg
 
-    print("Loading sampling values...")
-    with open("data/values.npy", "rb") as fp:
+    with open("../data/adult.npy", "rb") as fp:
         sampling_values = np.load(fp)
-    print("Done.")
-
-    print("Computing PDP decomposition...")
-    start_t = time()
-
-    explainer = PDPShapleySampler(knn.predict_proba, X_bg[:100], num_outputs=2, max_dim=2)
-
-    end_t = time()
-    print(f"Done in {end_t - start_t:.2f} seconds")
-
-
-    print("Computing Shapley values via PDP...")
-    start_t = time()
-    pdp_values = explainer.estimate_shapley_values(X_test)
-    end_t = time()
-    print(f"Done in {end_t - start_t:.2f} seconds")
-
-    pearson, spearman = get_corrs(pdp_values, sampling_values)
-    print("Correlations:")
-    print(f"\tPearson: {pearson}")
-    print(f"\tSpearman: {spearman}")
     
-    print("Computing Shapley values via PermutationExplainer...")
-    start_t = time()
-    med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
-    explainer = shap.Explainer(knn.predict_proba, med)
-    permutation_values = explainer(X_test).values
-    end_t = time()
-    print(f"Done in {end_t - start_t:.2f} seconds")
+    #X_test = X_test[:3, :]
+    #sampling_values = report.report_time(sampling, "Computing Shapley values via sampling...")
+
+    def sampling():
+        explainer = shap.explainers.Sampling(predict_fn, X_bg[:100])
+        sampling_values = np.array(explainer.shap_values(X_test)).transpose((1,2,0))
+        return sampling_values
+
+    def pdp():
+        explainer = PDPShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], max_dim=3, eps=0.)
+        for key, comp in explainer.pdp_decomp.components.items():
+            print(f"{key}: {comp.std} {comp.sig}")
+        pdp_values = explainer.estimate_shapley_values(X_test)
+        return pdp_values
+
+    def permutation():
+        #med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
+        explainer = shap.Explainer(predict_fn, X_bg[:100])
+        permutation_values = explainer(X_test)
+        return permutation_values
+
     
-    pearson, spearman = get_corrs(permutation_values, sampling_values)
-    print("Correlations:")
-    print(f"\tPearson: {pearson}")
-    print(f"\tSpearman: {spearman}")
+    pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
+    report.report_metrics(pdp_values, sampling_values)
+    #report.plot_metrics(pdp_values, sampling_values)
+
+    #permutation_values = report.report_time(permutation, "Computing Shapley values via PermutationExplainer...")
+    #report.report_metrics(permutation_values, sampling_values)
