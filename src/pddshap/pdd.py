@@ -1,19 +1,27 @@
-import numpy as np
 from itertools import combinations
-from typing import Tuple, Callable, Dict
-from scipy.interpolate import LinearNDInterpolator, interp1d
+from typing import Tuple, Callable, Dict, Optional
+from pddshap.estimator import PDDEstimator, ConstantEstimator, LinearInterpolationEstimator, TreeEstimator, ForestEstimator
+from pddshap.coordinate_generator import CoordinateGenerator, EquidistantGridGenerator
+import numpy as np
 from tqdm import tqdm
 
 
-class PDPComponent:
-    def __init__(self, features: Tuple, eps: float) -> None:
+class PDDComponent:
+    def __init__(self, features: Tuple, eps: float, coordinate_generator, estimator_type) -> None:
         self.features = sorted(features)
-        self.interpolator = None
+        self.estimator: Optional[PDDEstimator] = None
         self.std = 0
         self.eps = eps
         self.sig = True
         self.fitted = False
-    
+        est_constructors = {
+            "lin_interp": LinearInterpolationEstimator,
+            "tree": TreeEstimator,
+            "forest": ForestEstimator
+        }
+        self.est_constructor = est_constructors[estimator_type]
+        self.coordinate_generator = coordinate_generator
+
     def compute_partial_dependence(self, x: np.ndarray, X_bg: np.ndarray, model: Callable[[np.ndarray], np.ndarray]):
         # x: [len(self.features)]
         # X: [n, num_features]
@@ -26,17 +34,13 @@ class PDPComponent:
         return np.average(output, axis=0)
 
     def fit(self, X: np.ndarray, model: Callable[[np.ndarray], np.ndarray],
-            subcomponents: Dict[Tuple[int], "PDPComponent"], grid_res=10):
+            subcomponents: Dict[Tuple[int], "PDDComponent"]):
         if len(self.features) == 0:
-            avg_output = np.average(model(X), axis=0)
-            self.interpolator = lambda inp: np.tile(avg_output, (inp.shape[0], 1))
+            self.estimator = ConstantEstimator(np.average(model(X), axis=0))
         else:
             # X: [n, num_features]
             # Define a grid of values
-            # Meshgrid creates coordinate matrices for each feature
-            mg = np.meshgrid(*[np.linspace(np.min(X[:, feat]), np.max(X[:, feat]), grid_res) for feat in self.features])
-            # Convert coordinate matrices to a single matrix containing a row for each grid point
-            coords = np.vstack(list(map(np.ravel, mg))).transpose()
+            coords = self.coordinate_generator.get_coords(X[:, self.features])
 
             # For each grid value, get partial dependence and subtract proper subset components
             pd = np.array([self.compute_partial_dependence(row, X, model) for row in coords])
@@ -53,31 +57,32 @@ class PDPComponent:
             if self.features is not ():
                 self.sig = (np.max(self.std) > self.eps)
 
-            # Fit a model on resulting values 
+            # Fit a model on resulting values
             if np.max(pd) - np.min(pd) < 1e-5:
                 # If the partial dependence is constant, don't fit an interpolator
-                self.interpolator = lambda _: np.tile(pd[0], (X.shape[0], 1))
+                self.estimator = ConstantEstimator(pd[0])
             else:
-                if len(self.features) == 1:
-                    self.interpolator = interp1d(coords.flatten(), pd, fill_value="extrapolate", axis=0)
-                else:
-                    self.interpolator = LinearNDInterpolator(coords, pd, fill_value=0)  # TODO extrapolate using nearest interpolator (create wrapper class)
+                # Otherwise, fit a linear interpolator
+                self.estimator = self.est_constructor()
+                self.estimator.fit(coords, pd)
         self.fitted = True
 
     def __call__(self, X: np.ndarray):
         # X: [n, len(self.features)]
-        if self.interpolator is None:
+        if self.estimator is None:
             raise Exception("PDPComponent is not fitted yet")
-        if len(self.features) == 1:
-            return self.interpolator(X.flatten())
-        return self.interpolator(X)
+        return self.estimator(X)
 
 
-class PDPDecomposition:
-    def __init__(self, model: Callable[[np.ndarray], np.ndarray]) -> None:
+class PDDecomposition:
+    def __init__(self, model: Callable[[np.ndarray], np.ndarray], coordinate_generator: CoordinateGenerator, estimator_type: str) -> None:
         self.model = model
-        self.components: Dict[Tuple, PDPComponent] = {}
+        self.components: Dict[Tuple, PDDComponent] = {}
         self.average = 0
+        if coordinate_generator is None:
+            coordinate_generator = EquidistantGridGenerator(grid_res=10)
+        self.coordinate_generator = coordinate_generator
+        self.estimator_type = estimator_type
 
     def fit(self, X: np.ndarray, max_dim, eps) -> None:
         features = list(range(X.shape[1]))
@@ -85,7 +90,7 @@ class PDPDecomposition:
         # Fit PDP components up to dimension max_dim
         for i in range(max_dim + 1):
             if i == 0:
-                self.components[()] = PDPComponent((), eps)
+                self.components[()] = PDDComponent((), eps, self.coordinate_generator, self.estimator_type)
                 self.components[()].fit(X, self.model, {})
             else:
                 print(f"Fitting {i}-dimensional components...")
@@ -96,7 +101,7 @@ class PDPDecomposition:
                     subset: Tuple[int] = tuple(sorted(subset))
                     # subcomponents contains all PDPComponents for strict subsets of subset
                     subcomponents = {k: v for k, v in self.components.items() if all([feat in subset for feat in k])}
-                    self.components[subset] = PDPComponent(subset, eps)
+                    self.components[subset] = PDDComponent(subset, eps, self.coordinate_generator, self.estimator_type)
                     # Check if all subcomponents are significant
                     all_sig = all(subcomponents[k].sig for k in subcomponents)
                     if all_sig:
@@ -106,7 +111,7 @@ class PDPDecomposition:
                         # Otherwise, add component but mark as insignificant
                         # TODO we now add "dummy" components for insignificant interactions, this can be done more efficiently
                         self.components[subset].sig = False
-    
+
     def __call__(self, X: np.ndarray) -> Dict[Tuple[int], np.ndarray]:
         # X: [n, num_features]
         # Evaluate PDP decomposition at all rows in X
@@ -118,25 +123,3 @@ class PDPDecomposition:
         return result
 
 
-class PDPShapleySampler:
-    def __init__(self, model, X_background, num_outputs, max_dim=1, eps=0.05) -> None:
-        self.model = model
-        self.X_background = X_background
-
-        self.pdp_decomp = PDPDecomposition(self.model)
-        self.pdp_decomp.fit(self.X_background, max_dim, eps)
-        self.num_outputs = num_outputs
-
-    # TODO this can be optimized, see linear_model.py
-    def estimate_shapley_values(self, X):
-        result = []
-        pdp_values = self.pdp_decomp(X)
-        for i in range(X.shape[1]):
-            # [num_samples, num_outputs]
-            values_i = np.zeros((X.shape[0], self.num_outputs))
-            for feature_subset, values in pdp_values.items():
-                if i in feature_subset:
-                    values_i += values / len(feature_subset)
-            result.append(values_i)
-        # [num_samples, num_features, num_outputs]
-        return np.stack(result, axis=1)

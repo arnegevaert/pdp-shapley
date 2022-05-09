@@ -1,7 +1,7 @@
 import shap
 import numpy as np
-from pdp_decomp import PDPShapleySampler
-from lib import datasets, report
+from pddshap import PDDShapleySampler, RandomSubsampleGenerator
+from util import datasets, report
 import argparse
 
 
@@ -26,7 +26,6 @@ if __name__ == "__main__":
     
     X_bg = np.copy(X_train)
     rng.shuffle(X_bg)
-    X_bg = X_bg
 
     with open("../data/adult.npy", "rb") as fp:
         sampling_values = np.load(fp)
@@ -40,9 +39,8 @@ if __name__ == "__main__":
         return sampling_values
 
     def pdp():
-        explainer = PDPShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], max_dim=3, eps=0.)
-        for key, comp in explainer.pdp_decomp.components.items():
-            print(f"{key}: {comp.std} {comp.sig}")
+        explainer = PDDShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], max_dim=4, eps=0.01,
+                                      coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest")
         pdp_values = explainer.estimate_shapley_values(X_test)
         return pdp_values
 

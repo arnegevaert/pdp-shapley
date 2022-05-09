@@ -19,7 +19,7 @@ def report_metrics(values, true_values):
     print("Correlations:")
     print(f"\tPearson: {np.average(pearson)} ({np.median(pearson)})")
     print(f"\tSpearman: {np.average(spearman)} ({np.median(spearman)})")
-    print(f"\tR2: {np.average(r2)} ({np.median(r2)})")
+    print(f"\tR2: {r2}")
 
 
 def plot_metrics(values, true_values):

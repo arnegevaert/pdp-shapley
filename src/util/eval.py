@@ -23,9 +23,15 @@ def get_corrs(values1: np.ndarray, values2: np.ndarray):
 def get_r2(values: np.ndarray, true_values: np.ndarray):
     if values.shape != true_values.shape:
         raise ValueError(f"Shapes don't match: {values.shape}, {true_values.shape}")
-    
+
+    r2_values = []
+    for i in range(true_values.shape[2]):
+        r2_values.append(metrics.r2_score(true_values[:, :, i], values[:, :, i]))
+    return np.array(r2_values)
+    """
     r2_values = []
     for i in range(values.shape[0]):
         for j in range(true_values.shape[2]):
             r2_values.append(metrics.r2_score(values[i, :, j], true_values[i, :, j]))
     return np.array(r2_values)
+    """

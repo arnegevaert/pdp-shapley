@@ -1,4 +1,4 @@
-from pdp_decomp import PDPShapleySampler
+from pdp_decomp import PDDShapleySampler
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     print("Computing PDP decomposition...")
     start_t = time()
 
-    explainer = PDPShapleySampler(svm.predict_proba, X_train, num_outputs=2, max_dim=4)
+    explainer = PDDShapleySampler(svm.predict_proba, X_train, num_outputs=2, max_dim=4)
     pdp_values = explainer.estimate_shapley_values(X_test[:3, :])
     # Expected shape: (3, 5, 2) (samples, features, outputs)
     print(pdp_values.shape)
