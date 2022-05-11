@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     def pdp():
         explainer = PDDShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], max_dim=4, eps=0.01,
-                                      coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest")
+                                      coordinate_generator=RandomSubsampleGenerator(), estimator_type="lin_interp")
         pdp_values = explainer.estimate_shapley_values(X_test)
         return pdp_values
 
