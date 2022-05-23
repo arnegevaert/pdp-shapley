@@ -1,18 +1,24 @@
-from itertools import combinations
+from itertools import combinations, chain
 from typing import Tuple, Callable, Dict, Optional
 from pddshap.estimator import PDDEstimator, ConstantEstimator, LinearInterpolationEstimator, TreeEstimator, ForestEstimator
 from pddshap.coordinate_generator import CoordinateGenerator, EquidistantGridGenerator
 import numpy as np
 from tqdm import tqdm
+from pddshap.coe import cost_of_exclusion
+
+
+def _powerset(iterable):
+    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3)"
+    # Note: this version only returns strict subsets
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(len(s)))
 
 
 class PDDComponent:
-    def __init__(self, features: Tuple, eps: float, coordinate_generator, estimator_type) -> None:
+    def __init__(self, features: Tuple, coordinate_generator, estimator_type) -> None:
         self.features = sorted(features)
         self.estimator: Optional[PDDEstimator] = None
         self.std = 0
-        self.eps = eps
-        self.sig = True
         self.fitted = False
         est_constructors = {
             "lin_interp": LinearInterpolationEstimator,
@@ -52,11 +58,6 @@ class PDDComponent:
                 # subtract subcomponent from partial dependence
                 pd -= subcomponent(coords[:, relative_indices])
 
-            # Check if this interaction is significant
-            self.std = np.std(pd, axis=0)
-            if self.features is not ():
-                self.sig = (np.max(self.std) > self.eps)
-
             # Fit a model on resulting values
             if np.max(pd) - np.min(pd) < 1e-5:
                 # If the partial dependence is constant, don't fit an interpolator
@@ -84,13 +85,13 @@ class PDDecomposition:
         self.coordinate_generator = coordinate_generator
         self.estimator_type = estimator_type
 
-    def fit(self, X: np.ndarray, max_dim, eps) -> None:
+    def fit(self, X: np.ndarray, max_dim, eps=None) -> None:
         features = list(range(X.shape[1]))
         # self.average = np.average(self.model(X), axis=0)
         # Fit PDP components up to dimension max_dim
         for i in range(max_dim + 1):
             if i == 0:
-                self.components[()] = PDDComponent((), eps, self.coordinate_generator, self.estimator_type)
+                self.components[()] = PDDComponent((), self.coordinate_generator, self.estimator_type)
                 self.components[()].fit(X, self.model, {})
             else:
                 print(f"Fitting {i}-dimensional components...")
@@ -101,16 +102,14 @@ class PDDecomposition:
                     subset: Tuple[int] = tuple(sorted(subset))
                     # subcomponents contains all PDPComponents for strict subsets of subset
                     subcomponents = {k: v for k, v in self.components.items() if all([feat in subset for feat in k])}
-                    self.components[subset] = PDDComponent(subset, eps, self.coordinate_generator, self.estimator_type)
-                    # Check if all subcomponents are significant
-                    all_sig = all(subcomponents[k].sig for k in subcomponents)
-                    if all_sig:
-                        # If all subsets are significant, fit this component
-                        self.components[subset].fit(X, self.model, subcomponents)
-                    else:
-                        # Otherwise, add component but mark as insignificant
-                        # TODO we now add "dummy" components for insignificant interactions, this can be done more efficiently
-                        self.components[subset].sig = False
+                    # Check if all subcomponents are present
+                    if all([subcomponent in subcomponents for subcomponent in _powerset(subset)]):
+                        # If all subsets are significant, check if we need to fit this component
+                        coe = cost_of_exclusion(X, subset, self.model) if eps is not None else 0
+                        if eps is None or coe > eps:
+                            self.components[subset] = PDDComponent(subset, self.coordinate_generator,
+                                                                   self.estimator_type)
+                            self.components[subset].fit(X, self.model, subcomponents)
 
     def __call__(self, X: np.ndarray) -> Dict[Tuple[int], np.ndarray]:
         # X: [n, num_features]

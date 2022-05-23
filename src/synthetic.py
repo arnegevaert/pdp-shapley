@@ -32,16 +32,15 @@ if __name__ == "__main__":
     mean = np.zeros(num_features)
     cov = np.diag(np.random.random_sample(num_features))
     X_train = np.random.multivariate_normal(mean, cov, size=1000)
-    X_test = np.random.multivariate_normal(mean, cov, size=10000)
+    X_test = np.random.multivariate_normal(mean, cov, size=100)
 
     model = linear_model.RandomLinearModel(num_features=num_features, order=2)
-    y = model(X_train)
+    y = model(X_test)
     shapley_values = model.shapley_values(X_test)
     avg_output = model.beta[0]
 
     raw_values, pdd_values = report.report_time(pdd_shap, "Using PDD-SHAP...")
     print("Results:")
-    report.report_metrics(raw_values, np.expand_dims(shapley_values, -1))
     report.report_metrics(pdd_values, np.expand_dims(shapley_values, -1))
 
     perm_values = report.report_time(permutation_shap, "Using PermutationSampler...")
