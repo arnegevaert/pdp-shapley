@@ -3,7 +3,7 @@ from pddshap import PDDecomposition
 
 
 class PDDShapleySampler:
-    def __init__(self, model, X_background, num_outputs, max_dim=1, eps=None, coordinate_generator=None,
+    def __init__(self, model, X_background, num_outputs, max_dim=None, eps=None, coordinate_generator=None,
                  estimator_type="lin_interp") -> None:
         self.model = model
         self.X_background = X_background

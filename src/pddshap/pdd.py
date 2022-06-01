@@ -85,8 +85,10 @@ class PDDecomposition:
         self.coordinate_generator = coordinate_generator
         self.estimator_type = estimator_type
 
-    def fit(self, X: np.ndarray, max_dim, eps=None) -> None:
+    def fit(self, X: np.ndarray, max_dim=None, eps=None) -> None:
         features = list(range(X.shape[1]))
+        if max_dim is None:
+            max_dim = len(features)
         # self.average = np.average(self.model(X), axis=0)
         # Fit PDP components up to dimension max_dim
         for i in range(max_dim + 1):
@@ -106,6 +108,7 @@ class PDDecomposition:
                     if all([subcomponent in subcomponents for subcomponent in _powerset(subset)]):
                         # If all subsets are significant, check if we need to fit this component
                         coe = cost_of_exclusion(X, subset, self.model) if eps is not None else 0
+                        print(subset, coe)
                         if eps is None or coe > eps:
                             self.components[subset] = PDDComponent(subset, self.coordinate_generator,
                                                                    self.estimator_type)

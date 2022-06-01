@@ -39,7 +39,7 @@ if __name__ == "__main__":
         return sampling_values
 
     def pdp():
-        explainer = PDDShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], max_dim=4, eps=0.46,
+        explainer = PDDShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], eps=1e-2,
                                       coordinate_generator=RandomSubsampleGenerator(), estimator_type="tree")
         pdp_values = explainer.estimate_shapley_values(X_test, avg_output)
         return pdp_values
@@ -50,12 +50,10 @@ if __name__ == "__main__":
         permutation_values = explainer(X_test[:10])
         return permutation_values
 
-    """
     avg_output = np.average(predict_fn(X_bg))
     pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
     report.report_metrics(pdp_values, sampling_values)
     #report.plot_metrics(pdp_values, sampling_values)
-    """
 
-    permutation_values = report.report_time(permutation, "Computing Shapley values via PermutationExplainer...")
-    report.report_metrics(permutation_values, sampling_values[:10, ...])
+    #permutation_values = report.report_time(permutation, "Computing Shapley values via PermutationExplainer...")
+    #report.report_metrics(permutation_values, sampling_values[:10, ...])
