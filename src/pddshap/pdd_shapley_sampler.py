@@ -18,8 +18,7 @@ class PDDShapleySampler:
         pdp_values = self.pdp_decomp(X)
         for i in range(X.shape[1]):
             # [num_samples, num_outputs]
-            # TODO why do we fit a component for the empty set? Will never be used
-            # TODO am I double counting a bias here?
+            # TODO am I double counting a bias here (ANOVA component for the empty set)?
             values_i = np.zeros((X.shape[0], self.num_outputs))
             for feature_subset, values in pdp_values.items():
                 if i in feature_subset:

@@ -7,7 +7,7 @@ import shap
 
 def get_adult():
     X, y = shap.datasets.adult()
-    X_train, X_test, y_train, y_test = train_test_split(X.values, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     knn = KNeighborsClassifier()
     _train(knn, X_train, y_train)
     print(f"Balanced accuracy: {balanced_accuracy_score(y_test, knn.predict(X_test)):.2f}")

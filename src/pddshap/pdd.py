@@ -1,13 +1,14 @@
 from itertools import combinations, chain
-from typing import Tuple, Callable, Dict, Optional
+from typing import Tuple, Callable, Dict, Optional, Union
 from pddshap.estimator import PDDEstimator, ConstantEstimator, LinearInterpolationEstimator, TreeEstimator, ForestEstimator
 from pddshap.coordinate_generator import CoordinateGenerator, EquidistantGridGenerator
 import numpy as np
 from tqdm import tqdm
 from pddshap.coe import cost_of_exclusion
+import pandas as pd
 
 
-def _powerset(iterable):
+def _strict_powerset(iterable):
     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3)"
     # Note: this version only returns strict subsets
     s = list(iterable)
@@ -23,7 +24,8 @@ class PDDComponent:
         est_constructors = {
             "lin_interp": LinearInterpolationEstimator,
             "tree": TreeEstimator,
-            "forest": ForestEstimator
+            "forest": ForestEstimator,
+            "knn": None  # TODO
         }
         self.est_constructor = est_constructors[estimator_type]
         self.coordinate_generator = coordinate_generator
@@ -39,7 +41,7 @@ class PDDComponent:
             output = output.reshape(output.shape[0], 1)
         return np.average(output, axis=0)
 
-    def fit(self, X: np.ndarray, model: Callable[[np.ndarray], np.ndarray],
+    def fit(self, X: pd.DataFrame, model: Callable[[pd.DataFrame], np.ndarray],
             subcomponents: Dict[Tuple[int], "PDDComponent"]):
         if len(self.features) == 0:
             self.estimator = ConstantEstimator(np.average(model(X), axis=0))
@@ -68,7 +70,7 @@ class PDDComponent:
                 self.estimator.fit(coords, pd)
         self.fitted = True
 
-    def __call__(self, X: np.ndarray):
+    def __call__(self, X: Union[np.ndarray, pd.DataFrame]):
         # X: [n, len(self.features)]
         if self.estimator is None:
             raise Exception("PDPComponent is not fitted yet")
@@ -79,14 +81,13 @@ class PDDecomposition:
     def __init__(self, model: Callable[[np.ndarray], np.ndarray], coordinate_generator: CoordinateGenerator, estimator_type: str) -> None:
         self.model = model
         self.components: Dict[Tuple, PDDComponent] = {}
-        self.average = 0
         if coordinate_generator is None:
             coordinate_generator = EquidistantGridGenerator(grid_res=10)
         self.coordinate_generator = coordinate_generator
         self.estimator_type = estimator_type
 
-    def fit(self, X: np.ndarray, max_dim=None, eps=None) -> None:
-        features = list(range(X.shape[1]))
+    def fit(self, X: pd.DataFrame, max_dim=None, eps=None) -> None:
+        features = X.columns
         if max_dim is None:
             max_dim = len(features)
         # self.average = np.average(self.model(X), axis=0)
@@ -105,7 +106,7 @@ class PDDecomposition:
                     # subcomponents contains all PDPComponents for strict subsets of subset
                     subcomponents = {k: v for k, v in self.components.items() if all([feat in subset for feat in k])}
                     # Check if all subcomponents are present
-                    if all([subcomponent in subcomponents for subcomponent in _powerset(subset)]):
+                    if all([subcomponent in subcomponents for subcomponent in _strict_powerset(subset)]):
                         # If all subsets are significant, check if we need to fit this component
                         coe = cost_of_exclusion(X, subset, self.model) if eps is not None else 0
                         print(subset, coe)
@@ -114,7 +115,7 @@ class PDDecomposition:
                                                                    self.estimator_type)
                             self.components[subset].fit(X, self.model, subcomponents)
 
-    def __call__(self, X: np.ndarray) -> Dict[Tuple[int], np.ndarray]:
+    def __call__(self, X: pd.DataFrame) -> Dict[Tuple[int], np.ndarray]:
         # X: [n, num_features]
         # Evaluate PDP decomposition at all rows in X
         # Returns each component function value separately
