@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 class CoordinateGenerator:
@@ -21,11 +22,9 @@ class RandomSubsampleGenerator(CoordinateGenerator):
     def __init__(self, frac=1.0):
         self.frac = frac
 
-    def get_coords(self, X):
+    def get_coords(self, X: pd.DataFrame):
         if self.frac < 1.0:
-            size = int(self.frac * X.shape[0])
-            row_indices = np.random.choice(X.shape[0], size=size, replace=False)
-            return X[row_indices, :]
+            return X.sample(frac=self.frac)
         return X
 
 

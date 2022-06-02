@@ -1,8 +1,47 @@
 import numpy as np
+import pandas as pd
 from itertools import combinations
+from typing import List, Callable
 
 
-def cost_of_exclusion(data, model, iterations=10):
+class COECalculator:
+    def __init__(self, data: pd.DataFrame, model: Callable[[pd.DataFrame], np.ndarray], iterations=1):
+        self.data: pd.DataFrame = data.reset_index(drop=True)
+        self.shuffled_dfs = [data.sample(frac=1).reset_index(drop=True) for _ in range(iterations)]
+        self.model = model
+        self.y = self.model(self.data)
+        self.var = np.var(self.y, axis=0)
+        self.iterations = iterations
+
+    def __call__(self, subset: List[str]):
+        # Build the upper bound ANOVA structure U
+        columns = list(self.data.columns)
+        # TODO does using python lists here introduce an overhead?
+        if any([col not in columns for col in subset]):
+            raise ValueError(f"Invalid columns in subset: {subset}")
+        U = [[col for col in columns if col != subset_col] for subset_col in subset]
+        # We use an empirical estimate of the restricted ANOVA model G_U to estimate y
+        estimate = np.zeros_like(self.y)
+        for j in range(len(U)):
+            multiplier = 1 if j % 2 == 0 else -1
+            # Get all i-way intersections
+            intersect_combs = combinations(range(len(U)), j + 1)
+            for intersect_comb in intersect_combs:
+                intersection = U[intersect_comb[0]]
+                for k in range(1, len(intersect_comb)):
+                    intersection = [col for col in intersection if col in U[intersect_comb[k]]]
+                # Replace the relevant columns of shuffled data with the original data
+                cur_estimate = np.zeros_like(estimate)
+                for df in self.shuffled_dfs:
+                    shuffled_replaced = df.copy(deep=True)
+                    shuffled_replaced[intersection] = self.data[intersection]
+                    # Add term to estimate
+                    cur_estimate += multiplier * self.model(shuffled_replaced)
+                estimate += cur_estimate / self.iterations
+        return np.sum(np.power((self.y - estimate), 2)) / (self.var * self.data.shape[0])
+
+
+def cost_of_exclusion_np(data, model, iterations=10):
     num_features = data.shape[1]
     result = {}
     # We shuffle the data to produce the x_{r(i)} from the paper

@@ -23,15 +23,10 @@ if __name__ == "__main__":
     else:
         X_train, X_test, y_train, y_test, predict_fn = datasets.get_openml(_DS_DICT[args.dataset])
 
-    
-    X_bg = np.copy(X_train)
-    rng.shuffle(X_bg)
+    X_bg = X_train.sample(n=100)
 
     with open("../data/adult.npy", "rb") as fp:
         sampling_values = np.load(fp)
-    
-    #X_test = X_test[:3, :]
-    #sampling_values = report.report_time(sampling, "Computing Shapley values via sampling...")
 
     def sampling():
         explainer = shap.explainers.Sampling(predict_fn, X_bg[:100])
@@ -39,10 +34,10 @@ if __name__ == "__main__":
         return sampling_values
 
     def pdp():
-        explainer = PDDShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], eps=1e-2,
-                                      coordinate_generator=RandomSubsampleGenerator(), estimator_type="tree")
-        pdp_values = explainer.estimate_shapley_values(X_test, avg_output)
-        return pdp_values
+        explainer = PDDShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], eps=None,
+                                      coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest",
+                                      max_dim=1)
+        return explainer.estimate_shapley_values(X_test)
 
     def permutation():
         #med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
@@ -50,7 +45,6 @@ if __name__ == "__main__":
         permutation_values = explainer(X_test[:10])
         return permutation_values
 
-    avg_output = np.average(predict_fn(X_bg))
     pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
     report.report_metrics(pdp_values, sampling_values)
     #report.plot_metrics(pdp_values, sampling_values)
