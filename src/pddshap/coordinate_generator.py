@@ -12,6 +12,7 @@ class EquidistantGridGenerator(CoordinateGenerator):
         self.grid_res = grid_res
 
     def get_coords(self, X):
+        # TODO this removes necessary pandas DF information
         # Meshgrid creates coordinate matrices for each feature
         mg = np.meshgrid(*[np.linspace(np.min(X[:, i]), np.max(X[:, i]), self.grid_res) for i in range(X.shape[1])])
         # Convert coordinate matrices to a single matrix containing a row for each grid point

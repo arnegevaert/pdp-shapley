@@ -1,10 +1,11 @@
 import numpy as np
 from pddshap import PDDecomposition
+from pddshap.preprocessor import Preprocessor
 import pandas as pd
 
 
 class PDDShapleySampler:
-    def __init__(self, model, X_background: pd.DataFrame, num_outputs, max_dim=None, eps=None, coordinate_generator=None,
+    def __init__(self, model, X_background: pd.DataFrame, num_outputs, preprocessor: Preprocessor, max_dim=None, eps=None, coordinate_generator=None,
                  estimator_type="lin_interp", num_bg_samples=None) -> None:
         self.model = model
         self.X_background = X_background
@@ -12,9 +13,9 @@ class PDDShapleySampler:
             self.X_background = X_background.sample(n=num_bg_samples)
         # TODO this is only used for the orthogonal projection
         # TODO if we stop using the projection, remove this
-        self.bg_avg = np.average(self.model(self.X_background), axis=0)
+        self.bg_avg = np.average(self.model(preprocessor(self.X_background)), axis=0)
 
-        self.pdp_decomp = PDDecomposition(self.model, coordinate_generator, estimator_type)
+        self.pdp_decomp = PDDecomposition(self.model, coordinate_generator, estimator_type, preprocessor)
         self.pdp_decomp.fit(self.X_background, max_dim, eps)
         self.num_outputs = num_outputs
 

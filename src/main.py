@@ -17,13 +17,8 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--dataset", type=str, choices=_DS_DICT.keys(), default="adult")
     args = parser.parse_args()
 
-    X_train, X_test, y_train, y_test, predict_fn = datasets.get_dataset_model(_DS_DICT[args.dataset]["args"])
+    X_train, X_test, y_train, y_test, predict_fn, preproc = datasets.get_dataset_model(_DS_DICT[args.dataset]["args"])
     X_bg = X_train.sample(n=100)
-
-    # TODO generalize this somehow
-    with open("../data/adult.npy", "rb") as fp:
-        sampling_values = np.load(fp)
-
 
     def sampling():
         explainer = shap.explainers.Sampling(predict_fn, X_bg)
@@ -31,22 +26,22 @@ if __name__ == "__main__":
 
 
     def pdp():
-        explainer = PDDShapleySampler(predict_fn, X_bg, num_outputs=_DS_DICT[args.dataset]["num_outputs"],
+        explainer = PDDShapleySampler(predict_fn, X_bg, preprocessor=preproc, num_outputs=_DS_DICT[args.dataset]["num_outputs"],
                                       eps=None,
                                       coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest",
                                       max_dim=1)
-        return explainer.estimate_shapley_values(X_test)
+        return explainer.estimate_shapley_values(X_test[:100])
 
 
     def permutation():
         # med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
-        explainer = shap.Explainer(predict_fn, X_bg)
-        permutation_values = explainer(X_test[:10])
-        return permutation_values
+        explainer = shap.KernelExplainer(predict_fn, X_bg)
+        return explainer(X_test[:100])
 
 
-    pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
-    report.report_metrics(pdp_values, sampling_values)
+    # pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
+    permutation_values = report.report_time(permutation, "Computing Shapley values via permutation...")
+    report.report_metrics(pdp_values, permutation_values)
     # report.plot_metrics(pdp_values, sampling_values)
 
     # permutation_values = report.report_time(permutation, "Computing Shapley values via PermutationExplainer...")

@@ -7,6 +7,7 @@ import numpy as np
 from tqdm import tqdm
 from pddshap.coe import COECalculator
 import pandas as pd
+from pddshap.preprocessor import Preprocessor
 
 
 def _strict_powerset(iterable):
@@ -28,7 +29,7 @@ class ConstantPDDComponent:
 
 
 class PDDComponent:
-    def __init__(self, features: List[str], coordinate_generator, estimator_type) -> None:
+    def __init__(self, features: List[str], coordinate_generator, estimator_type: str, preprocessor: Preprocessor) -> None:
         self.features = features
         self.estimator: Optional[PDDEstimator] = None
         self.std = 0
@@ -41,6 +42,7 @@ class PDDComponent:
         }
         self.est_constructor = est_constructors[estimator_type]
         self.coordinate_generator = coordinate_generator
+        self.preprocessor = preprocessor
 
     def compute_partial_dependence(self, x: np.ndarray, X_bg: pd.DataFrame,
                                    model: Callable[[pd.DataFrame], np.ndarray]):
@@ -74,25 +76,26 @@ class PDDComponent:
         else:
             # Otherwise, fit a model
             self.estimator = self.est_constructor()
-            self.estimator.fit(coords, partial_dependence)
+            self.estimator.fit(self.preprocessor(coords), partial_dependence)
         self.fitted = True
 
     def __call__(self, X: pd.DataFrame):
         # X: [n, len(self.features)]
         if self.estimator is None:
             raise Exception("PDPComponent is not fitted yet")
-        return self.estimator(X)
+        return self.estimator(self.preprocessor(X))
 
 
 class PDDecomposition:
     def __init__(self, model: Callable[[pd.DataFrame], np.ndarray], coordinate_generator: CoordinateGenerator,
-                 estimator_type: str) -> None:
+                 estimator_type: str, preprocessor: Preprocessor) -> None:
         self.model = model
         self.components: Dict[Tuple, Union[ConstantPDDComponent, PDDComponent]] = {}
         if coordinate_generator is None:
             coordinate_generator = EquidistantGridGenerator(grid_res=10)
         self.coordinate_generator = coordinate_generator
         self.estimator_type = estimator_type
+        self.preprocessor = preprocessor
 
     def fit(self, X: pd.DataFrame, max_dim=None, eps=None) -> None:
         features = X.columns
@@ -122,7 +125,7 @@ class PDDecomposition:
                         coe = coe_calculator(subset) if eps is not None else 0
                         if eps is None or np.any(coe > eps):
                             self.components[tuple(subset)] = PDDComponent(subset, self.coordinate_generator,
-                                                                          self.estimator_type)
+                                                                          self.estimator_type, self.preprocessor)
                             self.components[tuple(subset)].fit(X, self.model, subcomponents)
 
     def __call__(self, X: pd.DataFrame) -> Dict[Tuple[int], np.ndarray]:
