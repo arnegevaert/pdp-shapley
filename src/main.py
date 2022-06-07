@@ -1,53 +1,53 @@
 import shap
+import argparse
 import numpy as np
+
 from pddshap import PDDShapleySampler, RandomSubsampleGenerator
 from util import datasets, report
-import argparse
 
 
 _DS_DICT = {
-    "superconductor": {"name": "superconduct", "type": "regression", "num_outputs": 1},
-    "credit": {"name": "credit-g", "type": "classification", "num_outputs": 2},
-    "adult": {"type": "classification", "num_outputs": 2}
+    "adult": {"args": {"name": "adult", "version": 2}, "num_outputs": 2},
+    "credit": {"args": {"name": "credit-g"}, "num_outputs": 2},
 }
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--dataset", type=str, choices=["adult"] + list(_DS_DICT.keys()), default="adult")
+    parser.add_argument("-d", "--dataset", type=str, choices=_DS_DICT.keys(), default="adult")
     args = parser.parse_args()
 
-    rng = np.random.default_rng(seed=42)
-
-    if args.dataset == "adult":
-        X_train, X_test, y_train, y_test, predict_fn = datasets.get_adult()
-    else:
-        X_train, X_test, y_train, y_test, predict_fn = datasets.get_openml(_DS_DICT[args.dataset])
-
+    X_train, X_test, y_train, y_test, predict_fn = datasets.get_dataset_model(_DS_DICT[args.dataset]["args"])
     X_bg = X_train.sample(n=100)
 
+    # TODO generalize this somehow
     with open("../data/adult.npy", "rb") as fp:
         sampling_values = np.load(fp)
 
+
     def sampling():
-        explainer = shap.explainers.Sampling(predict_fn, X_bg[:100])
-        sampling_values = np.array(explainer.shap_values(X_test)).transpose((1,2,0))
-        return sampling_values
+        explainer = shap.explainers.Sampling(predict_fn, X_bg)
+        return np.array(explainer.shap_values(X_test)).transpose((1, 2, 0))
+
 
     def pdp():
-        explainer = PDDShapleySampler(predict_fn, X_bg[:100], num_outputs=_DS_DICT[args.dataset]["num_outputs"], eps=None,
+        explainer = PDDShapleySampler(predict_fn, X_bg, num_outputs=_DS_DICT[args.dataset]["num_outputs"],
+                                      eps=None,
                                       coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest",
                                       max_dim=1)
         return explainer.estimate_shapley_values(X_test)
 
+
     def permutation():
-        #med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
-        explainer = shap.Explainer(predict_fn, X_bg[:100])
+        # med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
+        explainer = shap.Explainer(predict_fn, X_bg)
         permutation_values = explainer(X_test[:10])
         return permutation_values
 
+
     pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
     report.report_metrics(pdp_values, sampling_values)
-    #report.plot_metrics(pdp_values, sampling_values)
+    # report.plot_metrics(pdp_values, sampling_values)
 
-    #permutation_values = report.report_time(permutation, "Computing Shapley values via PermutationExplainer...")
-    #report.report_metrics(permutation_values, sampling_values[:10, ...])
+    # permutation_values = report.report_time(permutation, "Computing Shapley values via PermutationExplainer...")
+    # report.report_metrics(permutation_values, sampling_values[:10, ...])
