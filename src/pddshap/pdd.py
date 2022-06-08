@@ -18,11 +18,12 @@ def _strict_powerset(iterable):
 
 
 class ConstantPDDComponent:
-    def __init__(self):
+    def __init__(self, preprocessor: Preprocessor):
+        self.preprocessor = preprocessor
         self.estimator = None
 
     def fit(self, X: pd.DataFrame, model: Callable[[pd.DataFrame], np.ndarray]):
-        self.estimator = ConstantEstimator(np.average(model(X), axis=0))
+        self.estimator = ConstantEstimator(np.average(model(self.preprocessor(X)), axis=0))
 
     def __call__(self, X: pd.DataFrame):
         return self.estimator(X)
@@ -50,7 +51,7 @@ class PDDComponent:
         # X: [n, num_features]
         X_copy = X_bg.copy(deep=True)
         X_copy[self.features] = x[self.features]
-        output = model(X_copy)
+        output = model(self.preprocessor(X_copy))
         if len(output.shape) == 1:
             output = output.reshape(output.shape[0], 1)
         return np.average(output, axis=0)
@@ -99,14 +100,14 @@ class PDDecomposition:
 
     def fit(self, X: pd.DataFrame, max_dim=None, eps=None) -> None:
         features = X.columns
-        coe_calculator = COECalculator(X, self.model)
+        coe_calculator = COECalculator(X, self.model, self.preprocessor)
         if max_dim is None:
             max_dim = len(features)
         # self.average = np.average(self.model(X), axis=0)
         # Fit PDP components up to dimension max_dim
         for i in range(max_dim + 1):
             if i == 0:
-                self.components[()] = ConstantPDDComponent()
+                self.components[()] = ConstantPDDComponent(self.preprocessor)
                 self.components[()].fit(X, self.model)
             else:
                 print(f"Fitting {i}-dimensional components...")

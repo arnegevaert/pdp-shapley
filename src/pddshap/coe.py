@@ -5,11 +5,12 @@ from typing import List, Callable
 
 
 class COECalculator:
-    def __init__(self, data: pd.DataFrame, model: Callable[[pd.DataFrame], np.ndarray], iterations=1):
+    def __init__(self, data: pd.DataFrame, model: Callable[[pd.DataFrame], np.ndarray], preprocessor, iterations=1):
         self.data: pd.DataFrame = data.reset_index(drop=True)
         self.shuffled_dfs = [data.sample(frac=1).reset_index(drop=True) for _ in range(iterations)]
         self.model = model
-        self.y = self.model(self.data)
+        self.preprocessor = preprocessor
+        self.y = self.model(self.preprocessor(self.data))
         self.var = np.var(self.y, axis=0)
         self.iterations = iterations
 
@@ -36,7 +37,7 @@ class COECalculator:
                     shuffled_replaced = df.copy(deep=True)
                     shuffled_replaced[intersection] = self.data[intersection]
                     # Add term to estimate
-                    cur_estimate += multiplier * self.model(shuffled_replaced)
+                    cur_estimate += multiplier * self.model(self.preprocessor(shuffled_replaced))
                 estimate += cur_estimate / self.iterations
         return np.sum(np.power((self.y - estimate), 2)) / (self.var * self.data.shape[0])
 

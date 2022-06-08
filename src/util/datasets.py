@@ -15,7 +15,7 @@ def get_dataset_model(openml_args):
     # Encode labels
     y = LabelEncoder().fit_transform(y)
 
-    preproc = Preprocessor(df)
+    preproc = Preprocessor(df, categorical="ordinal")
     X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2, random_state=42)
     model = GradientBoostingClassifier(random_state=42)
     model.fit(preproc(X_train), y_train)

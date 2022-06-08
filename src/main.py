@@ -4,6 +4,8 @@ import numpy as np
 
 from pddshap import PDDShapleySampler, RandomSubsampleGenerator
 from util import datasets, report
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OrdinalEncoder
 
 
 _DS_DICT = {
@@ -27,21 +29,26 @@ if __name__ == "__main__":
 
     def pdp():
         explainer = PDDShapleySampler(predict_fn, X_bg, preprocessor=preproc, num_outputs=_DS_DICT[args.dataset]["num_outputs"],
-                                      eps=None,
-                                      coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest",
+                                      eps=0.,
+                                      coordinate_generator=RandomSubsampleGenerator(), estimator_type="tree",
                                       max_dim=1)
-        return explainer.estimate_shapley_values(X_test[:100])
+        return explainer.estimate_shapley_values(X_test[:10])
 
 
     def permutation():
+        def ord_encode(df):
+            result = df.copy()
+            for cat_idx in preproc.cat_idx:
+                result[cat_idx] = df[cat_idx].cat.codes
+            return result
         # med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
-        explainer = shap.KernelExplainer(predict_fn, X_bg)
-        return explainer(X_test[:100])
+        explainer = shap.SamplingExplainer(lambda df: predict_fn(preproc(df)), ord_encode(X_bg))
+        return explainer(ord_encode(X_test[:10]))
 
 
-    # pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
+    pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
     permutation_values = report.report_time(permutation, "Computing Shapley values via permutation...")
-    report.report_metrics(pdp_values, permutation_values)
+    report.report_metrics(pdp_values, permutation_values.values)
     # report.plot_metrics(pdp_values, sampling_values)
 
     # permutation_values = report.report_time(permutation, "Computing Shapley values via PermutationExplainer...")
