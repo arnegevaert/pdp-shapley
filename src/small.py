@@ -27,7 +27,7 @@ if __name__ == "__main__":
     start_t = time()
 
     explainer = PDDShapleySampler(svm.predict_proba, X_train, num_outputs=2, max_dim=4)
-    pdp_values = explainer.estimate_shapley_values(X_test[:3, :])
+    pdp_values = explainer.shapley_values(X_test[:3, :])
     # Expected shape: (3, 5, 2) (samples, features, outputs)
     print(pdp_values.shape)
 

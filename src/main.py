@@ -42,7 +42,7 @@ if __name__ == "__main__":
                 result[cat_idx] = df[cat_idx].cat.codes
             return result
         # med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
-        explainer = shap.SamplingExplainer(lambda df: predict_fn(preproc(df)), ord_encode(X_bg))
+        explainer = shap.Explainer(lambda df: predict_fn(preproc(df)), ord_encode(X_bg))
         return explainer(ord_encode(X_test[:10]))
 
 

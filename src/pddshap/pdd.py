@@ -7,7 +7,6 @@ import numpy as np
 from tqdm import tqdm
 from pddshap.coe import COECalculator
 import pandas as pd
-from pddshap.preprocessor import Preprocessor
 
 
 def _strict_powerset(iterable):
@@ -18,19 +17,18 @@ def _strict_powerset(iterable):
 
 
 class ConstantPDDComponent:
-    def __init__(self, preprocessor: Preprocessor):
-        self.preprocessor = preprocessor
+    def __init__(self):
         self.estimator = None
 
     def fit(self, X: pd.DataFrame, model: Callable[[pd.DataFrame], np.ndarray]):
-        self.estimator = ConstantEstimator(np.average(model(self.preprocessor(X)), axis=0))
+        self.estimator = ConstantEstimator(np.average(model(X), axis=0))
 
     def __call__(self, X: pd.DataFrame):
         return self.estimator(X)
 
 
 class PDDComponent:
-    def __init__(self, features: List[str], coordinate_generator, estimator_type: str, preprocessor: Preprocessor) -> None:
+    def __init__(self, features: List[str], coordinate_generator, estimator_type: str) -> None:
         self.features = features
         self.estimator: Optional[PDDEstimator] = None
         self.std = 0
@@ -43,7 +41,6 @@ class PDDComponent:
         }
         self.est_constructor = est_constructors[estimator_type]
         self.coordinate_generator = coordinate_generator
-        self.preprocessor = preprocessor
 
     def compute_partial_dependence(self, x: np.ndarray, X_bg: pd.DataFrame,
                                    model: Callable[[pd.DataFrame], np.ndarray]):
@@ -51,7 +48,7 @@ class PDDComponent:
         # X: [n, num_features]
         X_copy = X_bg.copy(deep=True)
         X_copy[self.features] = x[self.features]
-        output = model(self.preprocessor(X_copy))
+        output = model(X_copy)
         if len(output.shape) == 1:
             output = output.reshape(output.shape[0], 1)
         return np.average(output, axis=0)
@@ -77,37 +74,39 @@ class PDDComponent:
         else:
             # Otherwise, fit a model
             self.estimator = self.est_constructor()
-            self.estimator.fit(self.preprocessor(coords), partial_dependence)
+            self.estimator.fit(coords, partial_dependence)
         self.fitted = True
 
     def __call__(self, X: pd.DataFrame):
         # X: [n, len(self.features)]
         if self.estimator is None:
             raise Exception("PDPComponent is not fitted yet")
-        return self.estimator(self.preprocessor(X))
+        return self.estimator(X)
 
 
 class PDDecomposition:
     def __init__(self, model: Callable[[pd.DataFrame], np.ndarray], coordinate_generator: CoordinateGenerator,
-                 estimator_type: str, preprocessor: Preprocessor) -> None:
+                 estimator_type: str) -> None:
         self.model = model
         self.components: Dict[Tuple, Union[ConstantPDDComponent, PDDComponent]] = {}
         if coordinate_generator is None:
             coordinate_generator = EquidistantGridGenerator(grid_res=10)
         self.coordinate_generator = coordinate_generator
         self.estimator_type = estimator_type
-        self.preprocessor = preprocessor
+
+        self.bg_avg = None
 
     def fit(self, X: pd.DataFrame, max_dim=None, eps=None) -> None:
+        self.bg_avg = np.average(self.model(X), axis=0)
         features = X.columns
-        coe_calculator = COECalculator(X, self.model, self.preprocessor)
+        coe_calculator = COECalculator(X, self.model)
         if max_dim is None:
             max_dim = len(features)
         # self.average = np.average(self.model(X), axis=0)
         # Fit PDP components up to dimension max_dim
         for i in range(max_dim + 1):
             if i == 0:
-                self.components[()] = ConstantPDDComponent(self.preprocessor)
+                self.components[()] = ConstantPDDComponent()
                 self.components[()].fit(X, self.model)
             else:
                 print(f"Fitting {i}-dimensional components...")
@@ -126,10 +125,10 @@ class PDDecomposition:
                         coe = coe_calculator(subset) if eps is not None else 0
                         if eps is None or np.any(coe > eps):
                             self.components[tuple(subset)] = PDDComponent(subset, self.coordinate_generator,
-                                                                          self.estimator_type, self.preprocessor)
+                                                                          self.estimator_type)
                             self.components[tuple(subset)].fit(X, self.model, subcomponents)
 
-    def __call__(self, X: pd.DataFrame) -> Dict[Tuple[int], np.ndarray]:
+    def evaluate(self, X: pd.DataFrame) -> Dict[Tuple[int], np.ndarray]:
         # X: [n, num_features]
         # Evaluate PDP decomposition at all rows in X
         # Returns each component function value separately
@@ -140,3 +139,30 @@ class PDDecomposition:
             else:
                 result[subset] = component(X)
         return result
+
+    def __call__(self, X: pd.DataFrame):
+        # TODO evaluate and aggregate (use PDDecomposiion as surrogate model)
+        pass
+
+    # TODO this can be optimized, see linear_model.py
+    def shapley_values(self, X, project=False):
+        result = []
+        pdp_values = self.evaluate(X)
+        # Infer the number of outputs from the decomposition output
+        num_outputs = next(iter(pdp_values.items()))[1].shape[1]
+        for col in X.columns:
+            # [num_samples, num_outputs]
+            # TODO am I double counting a bias here (ANOVA component for the empty set)?
+            values_i = np.zeros((X.shape[0], num_outputs))
+            for feature_subset, values in pdp_values.items():
+                if col in feature_subset:
+                    values_i += values / len(feature_subset)
+            result.append(values_i)
+        # [num_samples, num_features, num_outputs]
+        raw_values = np.stack(result, axis=1)
+        if project:
+            # Orthogonal projection of Shapley values onto hyperplane x_1 + ... + x_d = c
+            # where c is the prediction difference
+            pred_diff = (self.model(X) - self.bg_avg).reshape(-1, 1, raw_values.shape[-1])
+            return raw_values - (np.sum(raw_values, axis=1, keepdims=True) - pred_diff) / X.shape[1]
+        return raw_values

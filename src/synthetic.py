@@ -1,19 +1,19 @@
-from pddshap import PDDShapleySampler, RandomSubsampleGenerator
+from pddshap import PDDecomposition, RandomSubsampleGenerator
 from util import report
 import numpy as np
 import shap
 from synth import linear_model
+import pandas as pd
+from pddshap.preprocessor import Preprocessor
+from sklearn.model_selection import train_test_split
 
 np.random.seed(0)
 
 
 def pdd_shap():
-    explainer = PDDShapleySampler(model, X_train, num_outputs=1, max_dim=2,
-                                  coordinate_generator=RandomSubsampleGenerator(),
-                                  estimator_type="tree")
-
-    print("Computing Shapley values...")
-    return explainer.estimate_shapley_values(X_test, avg_output)
+    decomposition = PDDecomposition(model, coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest")
+    decomposition.fit(X_train, max_dim=2, eps=0.)
+    return decomposition.shapley_values(X_test, project=True)
 
 
 def permutation_shap():
@@ -31,31 +31,26 @@ if __name__ == "__main__":
     num_features = 10
     mean = np.zeros(num_features)
     cov = np.diag(np.random.random_sample(num_features))
-    X_train = np.random.multivariate_normal(mean, cov, size=1000)
-    X_test = np.random.multivariate_normal(mean, cov, size=100)
+    X = np.random.multivariate_normal(mean, cov, size=1000)
 
     model = linear_model.RandomLinearModel(num_features=num_features, order=2)
-    y = model(X_test)
-    shapley_values = model.shapley_values(X_test)
+    y = model(X)
     avg_output = model.beta[0]
 
-    raw_values, pdd_values = report.report_time(pdd_shap, "Using PDD-SHAP...")
+    X_df = pd.DataFrame(X, columns=[f"feat_{i}" for i in range(num_features)])
+    preproc = Preprocessor(X_df, categorical="ordinal")
+    X_train, X_test, y_train, y_test = train_test_split(X_df, y, test_size=0.2)
+
+    pdd_values = report.report_time(pdd_shap, "Using PDD-SHAP...")
     print("Results:")
-    report.report_metrics(pdd_values, np.expand_dims(shapley_values, -1))
+    report.report_metrics(pdd_values, np.expand_dims(model.shapley_values(X_test.to_numpy()), -1))
 
     perm_values = report.report_time(permutation_shap, "Using PermutationSampler...")
     print("Results:")
-    report.report_metrics(perm_values, np.expand_dims(shapley_values, -1))
+    report.report_metrics(perm_values, np.expand_dims(model.shapley_values(X_test.to_numpy()), -1))
 
     """
     exact_values = report.report_time(exact_shap, "Using ExactExplainer...")
     print("Results:")
     report.report_metrics(exact_values, np.expand_dims(shapley_values, -1))
-    """
-
-    """
-    shapley_values = shapley_values.reshape(100, 10)
-    pdd_values = pdd_values.reshape(100, 10)
-    unscaled = unscaled.reshape(100, 10)
-    pred_diff = model(X_test) - avg_output
     """

@@ -9,6 +9,7 @@ class RandomLinearModel:
         self.num_features = num_features
         self.order = order
         self.polynomial_features = PolynomialFeatures(order, interaction_only=True)
+        self.poly_fitted = False
         self.num_parameters = 1 + np.sum([comb(num_features, i, exact=True) for i in range(1, order + 1)])
         # Parameters: bias, univariate, first order interactions, second order interactions, ...
         self.beta = np.random.uniform(low=-1.0, high=1.0, size=self.num_parameters)
@@ -28,7 +29,8 @@ class RandomLinearModel:
         interaction_columns = np.hstack(interaction_columns)
         X = np.hstack([X, interaction_columns])
         """
-        X = self.polynomial_features.fit_transform(X)
+        X = self.polynomial_features.fit_transform(X) if not self.poly_fitted else self.polynomial_features.transform(X)
+        self.poly_fitted = True
         # Add bias column
         #X = np.hstack([np.ones(X.shape[0]).reshape(-1, 1), X])
         return np.matmul(X, self.beta.transpose())
