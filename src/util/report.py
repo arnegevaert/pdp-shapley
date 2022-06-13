@@ -17,9 +17,9 @@ def report_metrics(values, true_values):
     pearson, spearman = get_corrs(values, true_values)
     r2 = get_r2(values, true_values)
     print("Correlations:")
-    print(f"\tPearson: {np.average(pearson)} ({np.median(pearson)})")
-    print(f"\tSpearman: {np.average(spearman)} ({np.median(spearman)})")
-    print(f"\tR2: {r2}")
+    print(f"\tPearson: {np.average(pearson):.3f} ({np.median(pearson):.3f})")
+    print(f"\tSpearman: {np.average(spearman):.3f} ({np.median(spearman):.3f})")
+    print(f"\tR2: {r2[0]:.3f}")
 
 
 def plot_metrics(values, true_values):
