@@ -12,7 +12,7 @@ np.random.seed(0)
 
 def pdd_shap():
     decomposition = PDDecomposition(model, coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest")
-    decomposition.fit(X_train, max_dim=2, eps=0.)
+    decomposition.fit(X_train, max_dim=2, eps=None)
     return decomposition.shapley_values(X_test, project=True)
 
 
@@ -31,14 +31,14 @@ if __name__ == "__main__":
     num_features = 10
     mean = np.zeros(num_features)
     cov = np.diag(np.random.random_sample(num_features))
-    X = np.random.multivariate_normal(mean, cov, size=1000)
+    X = np.random.multivariate_normal(mean, cov, size=1000).astype(np.float32)
 
     model = linear_model.RandomLinearModel(num_features=num_features, order=2)
     y = model(X)
     avg_output = model.beta[0]
 
     X_df = pd.DataFrame(X, columns=[f"feat_{i}" for i in range(num_features)])
-    preproc = Preprocessor(X_df, categorical="ordinal")
+    # preproc = Preprocessor(X_df, categorical="ordinal")
     X_train, X_test, y_train, y_test = train_test_split(X_df, y, test_size=0.2)
 
     pdd_values = report.report_time(pdd_shap, "Using PDD-SHAP...")

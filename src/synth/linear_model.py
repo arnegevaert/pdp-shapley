@@ -2,6 +2,7 @@ import numpy as np
 from scipy.special import comb
 import itertools
 from sklearn.preprocessing import PolynomialFeatures
+import pandas as pd
 
 
 class RandomLinearModel:
@@ -19,6 +20,8 @@ class RandomLinearModel:
 
     def __call__(self, X):
         assert(X.shape[1] == self.num_features)
+        if type(X) == pd.DataFrame:
+            X = X.to_numpy()
         # Add column for each interaction of 2 of more variables
         # Skip first 1 + self.num_features values: 1 bias + all univariate effects
         """
