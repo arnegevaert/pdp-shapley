@@ -199,3 +199,5 @@ pip-selfcheck.json
 
 data/*
 .idea/*
+tmp/
+out/

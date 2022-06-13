@@ -1,0 +1,7 @@
+datasets: [adult, credit, superconduct, housing]
+eps: [null, 0.01]
+max_dim: [1, 2, 3]
+estimator_type: [tree, forest]
+num_train: [100]
+num_test: [100]
+project: true, false

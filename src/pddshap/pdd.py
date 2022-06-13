@@ -130,7 +130,6 @@ class PDDecomposition:
                 self.components[()] = ConstantPDDComponent()
                 self.components[()].fit(X_np, self.model)
             else:
-                print(f"Fitting {i}-dimensional components...")
                 # Get all subsets of given dimensionality
                 subsets = list(combinations(features, i))
                 # Create and fit a PDPComponent for each
@@ -161,7 +160,7 @@ class PDDecomposition:
 
     def __call__(self, X: pd.DataFrame):
         # TODO evaluate and aggregate (use PDDecomposition as surrogate model)
-        pdp_values = self.evaluate(X)
+        pdp_values = self.evaluate(X.to_numpy())
         num_outputs = next(iter(pdp_values.items()))[1].shape[1]
         result = np.zeros((X.shape[0], num_outputs))
         for feature_subset, values in pdp_values.items():
