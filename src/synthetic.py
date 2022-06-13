@@ -4,14 +4,13 @@ import numpy as np
 import shap
 from synth import linear_model
 import pandas as pd
-from pddshap.preprocessor import Preprocessor
 from sklearn.model_selection import train_test_split
 
 np.random.seed(0)
 
 
 def pdd_shap():
-    decomposition = PDDecomposition(model, coordinate_generator=RandomSubsampleGenerator(), estimator_type="forest")
+    decomposition = PDDecomposition(model, coordinate_generator=RandomSubsampleGenerator(), estimator_type="tree")
     decomposition.fit(X_train, max_dim=2, eps=None)
     return decomposition.shapley_values(X_test, project=True)
 

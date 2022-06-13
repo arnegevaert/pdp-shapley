@@ -26,7 +26,7 @@ def get_r2(values: np.ndarray, true_values: np.ndarray):
 
     r2_values = []
     for i in range(true_values.shape[2]):
-        r2_values.append(metrics.r2_score(true_values[:, :, i], values[:, :, i]))
+        r2_values.append(metrics.r2_score(true_values[:, :, i].flatten(), values[:, :, i].flatten()))
     return np.array(r2_values)
     """
     r2_values = []

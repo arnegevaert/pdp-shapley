@@ -102,7 +102,7 @@ class PDDecomposition:
         self.categories = None
 
     def extract_data_signature(self, X: pd.DataFrame):
-        self.feature_names = X.columns
+        self.feature_names = list(X.columns)
         if len([col for col, dt in X.dtypes.items() if dt not in ["int8", "float32"]]) > 0:
             raise ValueError("Encode categorical values as int8 and numerical as float32")
         self.dtypes = X.dtypes
@@ -145,6 +145,7 @@ class PDDecomposition:
                         # TODO for some given value of eps
                         coe = coe_calculator(subset) if eps is not None else 0
                         if eps is None or np.any(coe > eps):
+                            # TODO pass relevant dtypes
                             self.components[tuple(subset)] = PDDComponent(subset, self.coordinate_generator,
                                                                           self.estimator_type)
                             self.components[tuple(subset)].fit(X_np, self.model, subcomponents)
@@ -160,22 +161,26 @@ class PDDecomposition:
 
     def __call__(self, X: pd.DataFrame):
         # TODO evaluate and aggregate (use PDDecomposition as surrogate model)
-        pass
+        pdp_values = self.evaluate(X)
+        num_outputs = next(iter(pdp_values.items()))[1].shape[1]
+        result = np.zeros((X.shape[0], num_outputs))
+        for feature_subset, values in pdp_values.items():
+            result += values
+        return result
 
     # TODO this can be optimized, see linear_model.py
-    def shapley_values(self, X, project=False):
+    def shapley_values(self, X: pd.DataFrame, project=False):
         result = []
-        if type(X) == pd.DataFrame:
-            X = X.to_numpy()
-        pdp_values = self.evaluate(X)
+        pdp_values = self.evaluate(X.to_numpy())
         # Infer the number of outputs from the decomposition output
         num_outputs = next(iter(pdp_values.items()))[1].shape[1]
         for col in X.columns:
             # [num_samples, num_outputs]
             # TODO am I double counting a bias here (ANOVA component for the empty set)?
             values_i = np.zeros((X.shape[0], num_outputs))
+            col_idx = self.feature_names.index(col)
             for feature_subset, values in pdp_values.items():
-                if col in feature_subset:
+                if col_idx in feature_subset:
                     values_i += values / len(feature_subset)
             result.append(values_i)
         # [num_samples, num_features, num_outputs]

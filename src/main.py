@@ -2,25 +2,34 @@ import shap
 import argparse
 import numpy as np
 
-from pddshap import PDDShapleySampler, RandomSubsampleGenerator
+from pddshap import PDDecomposition, RandomSubsampleGenerator
 from util import datasets, report
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OrdinalEncoder
 
 
 _DS_DICT = {
-    "adult": {"args": {"name": "adult", "version": 2}, "num_outputs": 2},
-    "credit": {"args": {"name": "credit-g"}, "num_outputs": 2},
+    "adult": {"openml_args": {"name": "adult", "version": 2}, "num_outputs": 2, "pred_type": "classification"},
+    "credit": {"openml_args": {"name": "credit-g"}, "num_outputs": 2, "pred_type": "classification"},
+    "superconduct": {"openml_args": {"name": "superconduct"}, "num_outputs": 1, "pred_type": "regression"},
+    "housing": {"openml_args": {"name": 43939}, "num_outputs": 1, "pred_type": "regression"},
+    "abalone": {"openml_args": {"data_id": 1557}, "num_outputs": 3, "pred_type": "classification"}
 }
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--dataset", type=str, choices=_DS_DICT.keys(), default="adult")
+    parser.add_argument("-d", "--dataset", type=str, choices=_DS_DICT.keys(), default="abalone")
+    parser.add_argument("-e", "--eps", type=float, default=None)
+    parser.add_argument("-m", "--max-dim", type=int, default=3)
+    parser.add_argument("--estimator-type", type=str, default="tree")
+    parser.add_argument("--num-train", type=int, default=1000)
+    parser.add_argument("--num-test", type=int, default=100)
     args = parser.parse_args()
 
-    X_train, X_test, y_train, y_test, predict_fn, preproc = datasets.get_dataset_model(_DS_DICT[args.dataset]["args"])
-    X_bg = X_train.sample(n=100)
+    X_train, X_test, y_train, y_test, predict_fn = datasets.get_dataset_model(**_DS_DICT[args.dataset])
+    X_test_sampled = X_test.sample(args.num_test)
+    X_bg = X_train.sample(n=args.num_train)
+    print(f"Number of train samples: {X_train.shape[0]}")
+    print(f"Number of test samples: {X_test.shape[0]}")
 
     def sampling():
         explainer = shap.explainers.Sampling(predict_fn, X_bg)
@@ -28,27 +37,22 @@ if __name__ == "__main__":
 
 
     def pdp():
-        explainer = PDDShapleySampler(predict_fn, X_bg, preprocessor=preproc, num_outputs=_DS_DICT[args.dataset]["num_outputs"],
-                                      eps=0.,
-                                      coordinate_generator=RandomSubsampleGenerator(), estimator_type="tree",
-                                      max_dim=1)
-        return explainer.estimate_shapley_values(X_test[:10])
+        decomposition = PDDecomposition(predict_fn, RandomSubsampleGenerator(), args.estimator_type)
+        decomposition.fit(X_bg, max_dim=args.max_dim, eps=args.eps)
+        return decomposition.shapley_values(X_test_sampled, project=True)
 
 
     def permutation():
-        def ord_encode(df):
-            result = df.copy()
-            for cat_idx in preproc.cat_idx:
-                result[cat_idx] = df[cat_idx].cat.codes
-            return result
         # med = np.median(X_train, axis=0).reshape((1,X_train.shape[1]))
-        explainer = shap.Explainer(lambda df: predict_fn(preproc(df)), ord_encode(X_bg))
-        return explainer(ord_encode(X_test[:10]))
-
+        explainer = shap.PermutationExplainer(predict_fn, X_bg.to_numpy())
+        return explainer(X_test_sampled.to_numpy())
 
     pdp_values = report.report_time(pdp, "Computing Shapley values via PDP...")
     permutation_values = report.report_time(permutation, "Computing Shapley values via permutation...")
-    report.report_metrics(pdp_values, permutation_values.values)
+    permutation_values = permutation_values.values
+    if len(permutation_values.shape) < 3:
+        permutation_values = np.expand_dims(permutation_values, -1)
+    report.report_metrics(pdp_values, permutation_values)
     # report.plot_metrics(pdp_values, sampling_values)
 
     # permutation_values = report.report_time(permutation, "Computing Shapley values via PermutationExplainer...")
