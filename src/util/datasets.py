@@ -1,6 +1,7 @@
 from sklearn.preprocessing import LabelEncoder, OrdinalEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
+from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.datasets import fetch_openml
 import pandas as pd
 import logging
@@ -33,11 +34,11 @@ def get_dataset_model(openml_args, pred_type):
 
     X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2, random_state=42)
     if pred_type == "classification":
-        logging.info("Fitting GBC...")
-        model = GradientBoostingClassifier(random_state=42)
+        print("Fitting classifier...")
+        model = GradientBoostingClassifier()
     else:
-        logging.info("Fitting GBR...")
-        model = GradientBoostingRegressor(random_state=42)
+        print("Fitting regressor...")
+        model = GradientBoostingClassifier()
     model.fit(X_train.to_numpy(), y_train.flatten())
-    pred_fn = model.predict_proba if type == "classification" else model.predict
+    pred_fn = model.predict_proba if pred_type == "classification" else model.predict
     return X_train, X_test, y_train, y_test, pred_fn

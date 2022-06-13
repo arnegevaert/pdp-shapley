@@ -201,3 +201,4 @@ data/*
 .idea/*
 tmp/
 out/
+results/

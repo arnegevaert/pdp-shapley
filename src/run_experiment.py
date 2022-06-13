@@ -9,8 +9,6 @@ from sklearn.metrics import balanced_accuracy_score, r2_score
 from pddshap import PDDecomposition, RandomSubsampleGenerator
 import time
 import shap
-import logging
-import warnings
 
 
 _DS_DICT = {
@@ -40,7 +38,8 @@ def run_experiment(ds_name, eps, max_dim, estimator_type, num_train, num_test, p
     print(f"Number of test samples: {X_test.shape[0]}")
 
     if _DS_DICT[ds_name]["pred_type"] == "classification":
-        print(f"Balanced accuracy: {balanced_accuracy_score(y_test, predict_fn(X_test.to_numpy())):.5f}")
+        y_pred = np.argmax(predict_fn(X_test.to_numpy()), axis=1)
+        print(f"Balanced accuracy: {balanced_accuracy_score(y_test, y_pred):.5f}")
     else:
         print(f"R2: {r2_score(y_test, predict_fn(X_test.to_numpy())):.5f}")
 
@@ -62,15 +61,17 @@ def run_experiment(ds_name, eps, max_dim, estimator_type, num_train, num_test, p
     print("PermutationExplainer...")
     perm_explainer = shap.PermutationExplainer(predict_fn, X_bg.to_numpy())
     perm_values, perm_gen_time = measure_runtime(lambda: perm_explainer(X_test_sampled.to_numpy()))
-    values["perm"] = perm_values
+    values["perm"] = perm_values.values
     timing["perm"] = {"gen_time": perm_gen_time, "train_time": 0.}
 
+    """
     # Sample Shapley values using KernelExplainer
     print("KernelExplainer...")
     kernel_explainer = shap.KernelExplainer(predict_fn, X_bg.to_numpy())
     kernel_values, kernel_gen_time = measure_runtime(lambda: kernel_explainer.shap_values(X_test_sampled.to_numpy()))
     values["kernel"] = kernel_values
     timing["kernel"] = {"gen_time": kernel_gen_time, "train_time": 0.}
+    """
 
     return values, timing, model_output, pdp_output
 
