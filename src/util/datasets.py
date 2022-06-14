@@ -5,7 +5,23 @@ from sklearn.datasets import fetch_openml
 import pandas as pd
 
 
-def get_dataset_model(data_id, pred_type):
+_DS_DICT = {
+    "adult": {"data_id": 1590, "pred_type": "classification"},
+    "credit": {"data_id": 31, "pred_type": "classification"},
+    "superconduct": {"data_id": 43174, "pred_type": "regression"},
+    "housing": {"data_id": 43939, "pred_type": "regression"},
+    "abalone": {"data_id": 1557, "pred_type": "classification"}
+}
+
+
+def get_valid_datasets():
+    return _DS_DICT.keys()
+
+
+def get_dataset_model(ds_name):
+    config = _DS_DICT[ds_name]
+    data_id = config["data_id"]
+    pred_type = config["pred_type"]
     # Get dataset from OpenML
     ds = fetch_openml(data_id=data_id)
     # Drop nan rows
@@ -32,11 +48,8 @@ def get_dataset_model(data_id, pred_type):
 
     X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2, random_state=42)
     if pred_type == "classification":
-        print("Fitting classifier...")
         model = GradientBoostingClassifier()
     else:
-        print("Fitting regressor...")
         model = GradientBoostingRegressor()
     model.fit(X_train.to_numpy(), y_train.flatten())
-    pred_fn = model.predict_proba if pred_type == "classification" else model.predict
-    return X_train, X_test, y_train, y_test, pred_fn
+    return X_train, X_test, y_train, y_test, model, pred_type

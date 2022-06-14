@@ -1,6 +1,5 @@
 import numpy as np
 from pddshap.coe import COECalculator
-import pandas as pd
 from itertools import combinations, chain
 
 """
@@ -19,15 +18,15 @@ def _strict_powerset(iterable):
     return chain.from_iterable(combinations(s, r) for r in range(1, len(s)))
 
 
-def model(X: pd.DataFrame):
-    return X[0] + X[1] * X[2]
+def model(X: np.ndarray):
+    return X[:, 0] + X[:, 1] * X[:, 2]
 
 
 if __name__ == "__main__":
     num_features = 3
     mean = np.random.rand(num_features)
     cov = np.diag(np.ones(num_features))
-    X = pd.DataFrame(np.random.multivariate_normal(mean, cov, size=1000))
+    X = np.random.multivariate_normal(mean, cov, size=1000)
     y = model(X)
 
     print(np.var(y))
