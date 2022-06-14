@@ -27,8 +27,8 @@ if __name__ == "__main__":
     parser.add_argument("exp_dir", type=str)
     parser.add_argument("dataset", type=str, choices=get_valid_datasets())
     parser.add_argument("-e", "--explainers", nargs="*", choices=_EXPLAINERS)
-    parser.add_argument("-n", "--num_test", type=int, default=10)
-    parser.add_argument("-b", "--num_bg", type=int, default=10)
+    parser.add_argument("-n", "--num_test", type=int, default=100)
+    parser.add_argument("-b", "--num_bg", type=int, default=100)
     args = parser.parse_args()
 
     explainers = args.explainers if args.explainers is not None else _EXPLAINERS

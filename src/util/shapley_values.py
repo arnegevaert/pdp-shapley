@@ -15,10 +15,10 @@ def compute_shapley_values(pred_fn, X_bg, X, explainer: str):
     elif explainer == "kernel":
         explainer = KernelExplainer(pred_fn, X_bg)
         values = explainer.shap_values(X)
-        if len(values.shape) < 3:
-            return np.expand_dims(values, -1)
+        if type(values) == list:
+            return np.stack(values, axis=-1)
         else:
-            return np.transpose(values, (1, 2, 0))
+            return np.expand_dims(values, -1)
     elif explainer == "sampling":
         explainer = SamplingExplainer(pred_fn, X_bg)
         values = explainer(X).values

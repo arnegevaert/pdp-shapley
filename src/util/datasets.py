@@ -14,6 +14,10 @@ _DS_DICT = {
 }
 
 
+def get_ds_metadata(ds_name):
+    return _DS_DICT[ds_name]
+
+
 def get_valid_datasets():
     return _DS_DICT.keys()
 
