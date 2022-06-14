@@ -12,11 +12,11 @@ import shap
 
 
 _DS_DICT = {
-    "adult": {"openml_args": {"name": "adult", "version": 2}, "pred_type": "classification"},
-    "credit": {"openml_args": {"name": "credit-g"}, "pred_type": "classification"},
-    "superconduct": {"openml_args": {"name": "superconduct"}, "pred_type": "regression"},
-    "housing": {"openml_args": {"name": 43939}, "pred_type": "regression"},
-    "abalone": {"openml_args": {"data_id": 1557}, "pred_type": "classification"}
+    "adult": {"data_id": 1590, "pred_type": "classification"},
+    "credit": {"data_id": 31, "pred_type": "classification"},
+    "superconduct": {"data_id": 43174, "pred_type": "regression"},
+    "housing": {"data_id": 43939, "pred_type": "regression"},
+    "abalone": {"data_id": 1557, "pred_type": "classification"}
 }
 
 
@@ -64,14 +64,12 @@ def run_experiment(ds_name, eps, max_dim, estimator_type, num_train, num_test, p
     values["perm"] = perm_values.values
     timing["perm"] = {"gen_time": perm_gen_time, "train_time": 0.}
 
-    """
     # Sample Shapley values using KernelExplainer
     print("KernelExplainer...")
     kernel_explainer = shap.KernelExplainer(predict_fn, X_bg.to_numpy())
     kernel_values, kernel_gen_time = measure_runtime(lambda: kernel_explainer.shap_values(X_test_sampled.to_numpy()))
-    values["kernel"] = kernel_values
+    values["kernel"] = np.transpose(kernel_values, (1,2,0))
     timing["kernel"] = {"gen_time": kernel_gen_time, "train_time": 0.}
-    """
 
     return values, timing, model_output, pdp_output
 

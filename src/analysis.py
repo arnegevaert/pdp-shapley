@@ -9,8 +9,7 @@ from scipy.stats import spearmanr
 def print_result_summary(exp_dir):
     with open(os.path.join(exp_dir, "config.json")) as fp:
         config = json.load(fp)
-    for key, value in config.items():
-        print(f"{key}: {value}")
+    print(f"{config['dataset']}: eps={config['eps']}, dim={config['max_dim']}, est={config['estimator_type']}, proj={config['project']}")
 
     values = {}
     with open(os.path.join(exp_dir, f"pdp.npy"), "rb") as fp:
@@ -24,6 +23,9 @@ def print_result_summary(exp_dir):
     for key in values.keys():
         print(f"Comparison to {key}:")
         shap_values = np.expand_dims(values[key], -1) if len(values[key].shape) != 3 else values[key]
+        if key == "kernel":
+            #shap_values = np.transpose(shap_values, (1,2,0))
+            pass
         report_metrics(pdp_values, shap_values)
 
     with open(os.path.join(exp_dir, "pdp_output.npy"), "rb") as fp:
@@ -31,6 +33,8 @@ def print_result_summary(exp_dir):
     with open(os.path.join(exp_dir, "model_output.npy"), "rb") as fp:
         true_output = np.load(fp)
     absolute_output_error = np.abs(surrogate_output - true_output)
+    if len(values["perm"].shape) != 3:
+        values["perm"] = np.expand_dims(values["perm"], -1)
     absolute_shap_error = np.average(np.abs(pdp_values - values["perm"]), axis=1)
     print(
         f"Correlation between errors: {spearmanr(absolute_output_error[:, 0], absolute_shap_error[:, 0])[0]:.3f}")
@@ -54,3 +58,6 @@ if __name__ == "__main__":
     for subexperiment in sorted(os.listdir(args.in_dir)):
         exp_dir = os.path.join(args.in_dir, subexperiment)
         print_result_summary(exp_dir)
+        print()
+        print("#"*80)
+        print()

@@ -1,4 +1,4 @@
-datasets: [adult]
+datasets: [abalone]
 eps: [null]
 max_dim: [1]
 estimator_type: [tree]
