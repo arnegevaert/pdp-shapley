@@ -159,7 +159,6 @@ class PDDecomposition:
         return result
 
     def __call__(self, X: pd.DataFrame):
-        # TODO evaluate and aggregate (use PDDecomposition as surrogate model)
         pdp_values = self.evaluate(X.to_numpy())
         num_outputs = next(iter(pdp_values.items()))[1].shape[1]
         result = np.zeros((X.shape[0], num_outputs))
@@ -187,6 +186,6 @@ class PDDecomposition:
         if project:
             # Orthogonal projection of Shapley values onto hyperplane x_1 + ... + x_d = c
             # where c is the prediction difference
-            pred_diff = (self.model(X) - self.bg_avg).reshape(-1, 1, raw_values.shape[-1])
+            pred_diff = (self.model(X.to_numpy()) - self.bg_avg).reshape(-1, 1, raw_values.shape[-1])
             return raw_values - (np.sum(raw_values, axis=1, keepdims=True) - pred_diff) / X.shape[1]
         return raw_values

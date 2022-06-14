@@ -3,7 +3,7 @@ This script trains a model, extracts a background distribution and test set,
 and computes shapley values using the different explainers in the shap package
 for a given dataset.
 
-It the saves the trained model, background distribution, test set,
+It then saves the trained model, background distribution, test set,
 and shapley values to disk.
 
 These files are necessary to start running experiments with PDDecomposition.
