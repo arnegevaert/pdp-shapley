@@ -1,7 +1,0 @@
-datasets: [abalone]
-eps: [null]
-max_dim: [1]
-estimator_type: [tree]
-num_train: [100]
-num_test: [100]
-project: [true]
