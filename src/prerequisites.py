@@ -16,10 +16,11 @@ import os
 import numpy as np
 from sklearn.metrics import balanced_accuracy_score, r2_score
 import pickle
+import time
+import json
 
 
 _EXPLAINERS = ["kernel", "permutation", "sampling"]
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -54,8 +55,19 @@ if __name__ == "__main__":
     with open(os.path.join(args.exp_dir, "X_test.csv"), "w") as fp:
         X_test_sampled.to_csv(fp)
 
+    meta = {
+        "dataset": args.dataset,
+        "num_test": args.num_test,
+        "num_bg": args.num_bg,
+        "runtime": {}
+    }
     for explainer in explainers:
         print(f"Computing Shapley values using {explainer} explainer...")
+        start_t = time.time()
         values = compute_shapley_values(pred_fn, X_bg, X_test_sampled, explainer)
+        end_t = time.time()
+        meta["runtime"][explainer] = end_t - start_t
         with open(os.path.join(args.exp_dir, f"{explainer}.npy"), "wb") as fp:
             np.save(fp, values)
+    with open(os.path.join(args.exp_dir, "meta.json"), "w") as fp:
+        json.dump(meta, fp)
