@@ -16,25 +16,26 @@ def _compare(values1, values2, name1, name2):
 
 def _get_pdd_output(subdir):
     result = {}
-    for filename in os.listdir(os.path.join(args.exp_dir, subdir)):
+    for filename in os.listdir(os.path.join(args.dir, subdir)):
         root, ext = os.path.splitext(filename)
-        with open(os.path.join(args.exp_dir, subdir, filename), "rb") as fp:
+        with open(os.path.join(args.dir, subdir, filename), "rb") as fp:
             result[root] = np.load(fp)
     return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("exp_dir", type=str)
+    parser.add_argument("dir", type=str)
+    parser.add_argument("exp_name")
     args = parser.parse_args()
 
     shap_values = {}
     for explainer in ["kernel", "permutation", "sampling"]:
-        with open(os.path.join(args.exp_dir, f"{explainer}.npy"), "rb") as fp:
+        with open(os.path.join(args.dir, f"{explainer}.npy"), "rb") as fp:
             shap_values[explainer] = np.load(fp)
 
-    pdd_shap_values = _get_pdd_output("vary_max_dim/values")
-    pdd_output = _get_pdd_output("vary_max_dim/output")
+    pdd_shap_values = _get_pdd_output(f"{args.exp_name}/values")
+    pdd_output = _get_pdd_output(f"{args.exp_name}/output")
 
     _compare(shap_values["kernel"], shap_values["permutation"], "KernelExplainer", "PermutationExplainer")
     _compare(shap_values["sampling"], shap_values["permutation"], "SamplingExplainer", "PermutationExplainer")
@@ -46,9 +47,9 @@ if __name__ == "__main__":
     for key in keys:
         _compare(pdd_shap_values[key], shap_values["sampling"], f"PDD-SHAP: {key}", "SamplingExplainer")
 
-    with open(os.path.join(args.exp_dir, "meta.json")) as fp:
+    with open(os.path.join(args.dir, "meta.json")) as fp:
         meta = json.load(fp)
-    with open(os.path.join(args.exp_dir, "vary_max_dim", "meta.json")) as fp:
+    with open(os.path.join(args.dir, "vary_max_dim", "meta.json")) as fp:
         pdd_meta = json.load(fp)
 
     print("#" * 80)

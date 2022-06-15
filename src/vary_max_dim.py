@@ -6,6 +6,9 @@ It will then train a PDDecomposition with max_dim varying between 1 and max_valu
 using the background and test sets in the experiment directory for each decomposition. These Shapley values
 are saved to disk in a subdirectory of the experiment directory (exp_name), along with a meta.json file containing
 the hyperparameters and runtime information (training + inference).
+
+TODO this script should be extended to a general-purpose experiment script.
+TODO any experiment (i.e. varying epsilon, varying estimator, etc) would then correspond to a subfolder exp_name
 """
 
 import argparse
@@ -32,7 +35,8 @@ if __name__ == "__main__":
     parser.add_argument("--max-value", type=int, default=3)
     parser.add_argument("--epsilon", type=float, default=None)
     parser.add_argument("--project", type=bool, default=True)
-    parser.add_argument("--estimator", type=str, choices=["tree", "forest", "knn"], default="tree")
+    parser.add_argument("--estimator", type=str, choices=["tree", "forest", "knn"], default="knn")
+    parser.add_argument("-k", type=int, default=None)
     args = parser.parse_args()
 
     subdir = os.path.join(args.exp_dir, args.exp_name)
@@ -52,8 +56,6 @@ if __name__ == "__main__":
         model = pickle.load(fp)
     pred_fn = model.predict_proba if ds_meta["pred_type"] == "classification" else model.predict
 
-    # TODO we need iloc here because pandas has saved the index column to csv
-    # TODO fix this by not saving that column in prerequisites.py
     X_bg = pd.read_csv(os.path.join(args.exp_dir, "X_bg.csv"))
     X_test = pd.read_csv(os.path.join(args.exp_dir, "X_test.csv"))
     X_bg = _convert_dtypes(X_bg)
@@ -66,9 +68,14 @@ if __name__ == "__main__":
         "project": args.project,
         "runtime": {}
     }
+
+    est_kwargs = {}
+    if args.k is not None:
+        est_kwargs["k"] = args.k
+
     for max_dim in range(1, args.max_value + 1):
         print(f"max_dim={max_dim}/{args.max_value}")
-        decomposition = PDDecomposition(pred_fn, RandomSubsampleGenerator(), args.estimator)
+        decomposition = PDDecomposition(pred_fn, RandomSubsampleGenerator(), args.estimator, est_kwargs)
 
         start_t = time.time()
         decomposition.fit(X_bg, max_dim, args.epsilon)

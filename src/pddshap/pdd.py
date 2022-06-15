@@ -1,7 +1,7 @@
 from itertools import combinations, chain
 from typing import Tuple, Callable, Dict, Optional, Union, List
 from pddshap.estimator import PDDEstimator, ConstantEstimator, LinearInterpolationEstimator, TreeEstimator, \
-    ForestEstimator
+    ForestEstimator, KNNEstimator
 from pddshap.coordinate_generator import CoordinateGenerator, EquidistantGridGenerator
 import numpy as np
 from tqdm import tqdm
@@ -28,7 +28,7 @@ class ConstantPDDComponent:
 
 
 class PDDComponent:
-    def __init__(self, features: List[int], coordinate_generator, estimator_type: str) -> None:
+    def __init__(self, features: List[int], coordinate_generator, estimator_type: str, dtypes, categories, est_kwargs) -> None:
         self.features = features
         self.estimator: Optional[PDDEstimator] = None
         self.std = 0
@@ -37,10 +37,13 @@ class PDDComponent:
             "lin_interp": LinearInterpolationEstimator,
             "tree": TreeEstimator,
             "forest": ForestEstimator,
-            "knn": None  # TODO
+            "knn": KNNEstimator
         }
         self.est_constructor = est_constructors[estimator_type]
         self.coordinate_generator = coordinate_generator
+        self.dtypes = dtypes
+        self.categories = categories
+        self.est_kwargs = est_kwargs
 
     def compute_partial_dependence(self, x: np.ndarray, X_bg: np.ndarray,
                                    model: Callable[[np.ndarray], np.ndarray]):
@@ -75,7 +78,7 @@ class PDDComponent:
             self.estimator = ConstantEstimator(partial_dependence[0])
         else:
             # Otherwise, fit a model
-            self.estimator = self.est_constructor()
+            self.estimator = self.est_constructor(self.dtypes, self.categories, **self.est_kwargs)
             self.estimator.fit(coords, partial_dependence)
         self.fitted = True
 
@@ -88,13 +91,14 @@ class PDDComponent:
 
 class PDDecomposition:
     def __init__(self, model: Callable[[np.ndarray], np.ndarray], coordinate_generator: CoordinateGenerator,
-                 estimator_type: str) -> None:
+                 estimator_type: str, est_kwargs=None) -> None:
         self.model = model
         self.components: Dict[Tuple, Union[ConstantPDDComponent, PDDComponent]] = {}
         if coordinate_generator is None:
             coordinate_generator = EquidistantGridGenerator(grid_res=10)
         self.coordinate_generator = coordinate_generator
         self.estimator_type = estimator_type
+        self.est_kwargs = est_kwargs if est_kwargs is not None else {}
 
         self.bg_avg = None
         self.feature_names = None
@@ -109,9 +113,9 @@ class PDDecomposition:
         self.categories = []
         for i, feat_name in enumerate(self.feature_names):
             if self.dtypes[i] == "float32":
-                self.categories.append(0)
+                self.categories.append([])
             else:
-                self.categories.append(X[feat_name].nunique())
+                self.categories.append(list(range(X[feat_name].max() + 1)))
 
     def fit(self, X: pd.DataFrame, max_dim=None, eps=None) -> None:
         self.extract_data_signature(X)
@@ -144,9 +148,11 @@ class PDDecomposition:
                         # TODO for some given value of eps
                         coe = coe_calculator(subset) if eps is not None else 0
                         if eps is None or np.any(coe > eps):
-                            # TODO pass relevant dtypes
+                            dtypes = [self.dtypes[i] for i in subset]
+                            categories = [self.categories[i] for i in subset]
                             self.components[tuple(subset)] = PDDComponent(subset, self.coordinate_generator,
-                                                                          self.estimator_type)
+                                                                          self.estimator_type, dtypes, categories,
+                                                                          self.est_kwargs)
                             self.components[tuple(subset)].fit(X_np, self.model, subcomponents)
 
     def evaluate(self, X: np.ndarray) -> Dict[Tuple[int], np.ndarray]:
