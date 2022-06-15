@@ -54,8 +54,8 @@ if __name__ == "__main__":
 
     # TODO we need iloc here because pandas has saved the index column to csv
     # TODO fix this by not saving that column in prerequisites.py
-    X_bg = pd.read_csv(os.path.join(args.exp_dir, "X_bg.csv")).iloc[:, 1:]
-    X_test = pd.read_csv(os.path.join(args.exp_dir, "X_test.csv")).iloc[: , 1:]
+    X_bg = pd.read_csv(os.path.join(args.exp_dir, "X_bg.csv"))
+    X_test = pd.read_csv(os.path.join(args.exp_dir, "X_test.csv"))
     X_bg = _convert_dtypes(X_bg)
     X_test = _convert_dtypes(X_test)
     print("Done.")

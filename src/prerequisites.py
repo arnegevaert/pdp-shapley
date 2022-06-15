@@ -51,9 +51,9 @@ if __name__ == "__main__":
     with open(os.path.join(args.exp_dir, "model.pkl"), "wb") as fp:
         pickle.dump(model, fp)
     with open(os.path.join(args.exp_dir, "X_bg.csv"), "w") as fp:
-        X_bg.to_csv(fp)
+        X_bg.to_csv(fp, index=False)
     with open(os.path.join(args.exp_dir, "X_test.csv"), "w") as fp:
-        X_test_sampled.to_csv(fp)
+        X_test_sampled.to_csv(fp, index=False)
 
     meta = {
         "dataset": args.dataset,
