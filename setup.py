@@ -4,7 +4,7 @@ setup(
     name="pddshap",
     version="0.0.1",
     author="Arne Gevaert",
-    python_requires=">=3.7, <4",
+    python_requires=">=3.6.8, <4",
     install_requires=[
         "numpy",
         "pandas",

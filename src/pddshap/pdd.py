@@ -1,6 +1,6 @@
 from itertools import combinations, chain
 from typing import Tuple, Callable, Dict, Optional, Union, List
-from pddshap.estimator import PDDEstimator, ConstantEstimator, LinearInterpolationEstimator, TreeEstimator, \
+from pddshap.estimator import PDDEstimator, ConstantEstimator, TreeEstimator, \
     ForestEstimator, KNNEstimator
 from pddshap.coordinate_generator import CoordinateGenerator, EquidistantGridGenerator
 import numpy as np
@@ -34,7 +34,6 @@ class PDDComponent:
         self.std = 0
         self.fitted = False
         est_constructors = {
-            "lin_interp": LinearInterpolationEstimator,
             "tree": TreeEstimator,
             "forest": ForestEstimator,
             "knn": KNNEstimator

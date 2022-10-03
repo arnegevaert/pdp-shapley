@@ -31,24 +31,6 @@ class ConstantEstimator(PDDEstimator):
         return np.tile(self.output, (X.shape[0], 1))
 
 
-class LinearInterpolationEstimator(PDDEstimator):
-    def __init__(self, dtypes, categories):
-        super().__init__(dtypes, categories)
-        self.interpolator = None
-
-    def fit(self, coords: np.ndarray, partial_dependence: np.ndarray):
-        if coords.shape[1] == 1:
-            self.interpolator = interp1d(coords.flatten(), partial_dependence, fill_value="extrapolate", axis=0)
-        else:
-            # TODO extrapolate using nearest interpolator (create wrapper class)
-            self.interpolator = LinearNDInterpolator(coords, partial_dependence, fill_value=0)
-
-    def __call__(self, X):
-        if X.shape[1] == 1:
-            return self.interpolator(X.flatten())
-        return self.interpolator(X)
-
-
 class TreeEstimator(PDDEstimator):
     def __init__(self, dtypes, categories):
         super().__init__(dtypes, categories)
