@@ -1,0 +1,16 @@
+from setuptools import setup
+
+setup(
+    name="pddshap",
+    version="0.0.1",
+    author="Arne Gevaert",
+    python_requires=">=3.7, <4",
+    install_requires=[
+        "numpy",
+        "pandas",
+        "scikit-learn",
+        "scipy",
+        "matplotlib",
+        "shap"
+    ]
+)

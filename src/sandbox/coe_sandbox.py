@@ -1,6 +1,7 @@
 import numpy as np
-from pddshap.coe import COECalculator
+from pddshap.coe import COECalculator, cost_of_exclusion_np
 from itertools import combinations, chain
+import time
 
 def model(X):
     return X[:, 0] + \
@@ -29,7 +30,16 @@ if __name__ == "__main__":
 
     print(np.var(y))
 
-    calculator = COECalculator(X, model, iterations=10)
+    start_t = time.time()
+    coe_dict = cost_of_exclusion_np(X, model, iterations=1000)
+    end_t = time.time()
+    print(f"Numpy implementation took {end_t - start_t:.3f}s")
+
+    start_t = time.time()
+    calculator = COECalculator(X, model, iterations=1000)
     for subset in _strict_powerset(range(num_features)):
         coe = calculator(list(subset))
-        print(f"{subset}:\t{coe:.3f}")
+        #coe_np = coe_dict[subset]
+        #print(f"{subset}:\t{coe:.3f}\t{coe_np:.3f}\t{coe_np/coe:.3f}")
+    end_t = time.time()
+    print(f"Pure Python implementation took {end_t - start_t:.3f}s")
