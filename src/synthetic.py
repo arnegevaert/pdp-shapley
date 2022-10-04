@@ -2,7 +2,7 @@ from pddshap import PDDecomposition, RandomSubsampleGenerator
 from util import report
 import numpy as np
 import shap
-from synth import linear_model
+from synth import random_linear_model
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     cov = np.diag(np.random.random_sample(num_features))
     X = np.random.multivariate_normal(mean, cov, size=1000).astype(np.float32)
 
-    model = linear_model.RandomLinearModel(num_features=num_features, order=2)
+    model = random_linear_model.RandomLinearModel(num_features=num_features, order=2)
     y = model(X)
     avg_output = model.beta[0]
 
