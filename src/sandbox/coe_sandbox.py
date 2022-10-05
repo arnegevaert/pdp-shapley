@@ -10,11 +10,6 @@ def model(X):
            X[:, 0] * X[:, 3] * X[:, 4] + \
            X[:, 0] * X[:, 1] * X[:, 2] * X[:, 3]
 
-def _strict_powerset(iterable):
-    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3)"
-    # Note: this version only returns strict subsets
-    s = list(iterable)
-    return chain.from_iterable(combinations(s, r) for r in range(1, len(s)))
 
 """
 def model(X: np.ndarray):

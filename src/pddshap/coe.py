@@ -2,7 +2,8 @@ import numpy as np
 from itertools import combinations
 from typing import List, Callable
 
-
+# TODO have a class that computes all significant subsets,
+# TODO ignoring subsets with insignificant subsubsets
 class COECalculator:
     def __init__(self, data: np.ndarray, model: Callable[[np.ndarray], np.ndarray], iterations=1):
         self.data = data

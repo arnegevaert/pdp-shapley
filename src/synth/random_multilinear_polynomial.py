@@ -52,7 +52,7 @@ class RandomMultilinearPolynomial:
                 else:
                     count = 0
                     while count < num_interactions:
-                        subset = tuple(np.random.choice(self.num_features, size=k, replace=False))
+                        subset = tuple(np.sort(np.random.choice(self.num_features, size=k, replace=False)))
                         if subset not in self.coefficients.keys():
                             self.coefficients[subset] = np.random.normal()
                             count += 1
