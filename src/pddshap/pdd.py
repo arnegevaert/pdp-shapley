@@ -171,7 +171,7 @@ class PDDecomposition:
             result += values
         return result
 
-    # TODO this can be optimized, see random_linear_model.py
+    # TODO this can be optimized, see random_multilinear_polynomial.py
     def shapley_values(self, X: pd.DataFrame, project=False):
         result = []
         pdp_values = self.evaluate(X.to_numpy())
