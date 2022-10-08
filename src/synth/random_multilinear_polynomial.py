@@ -1,61 +1,22 @@
 import numpy as np
 from scipy import special
 import itertools
-from typing import Dict, Tuple, List, Union
+from typing import Dict, Tuple, List, Union, Callable
 from numpy import typing
-import shap
-import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("TkAgg")
 
 
-class RandomMultilinearPolynomial:
-    def __init__(self, num_features: int, order_terms: List[Union[int, float]]):
+class MultilinearPolynomial:
+    def __init__(self, num_features: int, coefficients: Dict[Tuple, float]):
         """
-        Arguments:
-            num_features: total amount of input features
-            order_terms: List array containing the number of terms of each order.
-                Example: order_terms[3] = the number of desired third-order terms.
-                If order_terms[k] is -1, then all k-order terms are included.
-                If len(order_terms) < num_features, then all entries between len(order_terms) and num_features
-                are assumed to be 0.
-                Example: if len(order_terms) == 3, we will only have a bias, univariate and bivariate terms.
-                If order_terms[k] is a float between 0 and 1, it is interpreted as a relative amount:
-                the fraction of all possible interactions.
+        Initialize the multilinear polynomial with a given number of features and coefficients
+        :param num_features: Total number of input features.
+        :param coefficients: Dictionary mapping tuples of integers (representing a subset of features) to the
+            coefficient (float) of the corresponding monomial.
         """
         self.num_features = num_features
-        self.coefficients: Dict[Tuple, float] = {}
-        for k in range(len(order_terms)):
-            total_num_interactions = special.comb(num_features, k)
-            if type(order_terms[k]) == int:
-                num_interactions = order_terms[k]
-            else:
-                num_interactions = int(order_terms[k] * total_num_interactions)
-            if num_interactions > total_num_interactions:
-                raise ValueError(f"Cannot have more than {total_num_interactions} terms of order {k}")
-            elif num_interactions == -1:
-                # Add all interactions of order k
-                for comb in itertools.combinations(list(range(self.num_features)), k):
-                    self.coefficients[comb] = np.random.normal()
-            else:
-                # Add the required amount of interactions of order k
-                # If the number of required terms is more than 90% of the total number of terms,
-                # we do this by generating all of them and sampling without replacement.
-                # Otherwise, we sample randomly, throwing out duplicates
-                # (avoids generating ${n \choose order_terms[k]}$ subsets).
-                if num_interactions / total_num_interactions > 0.9:
-                    all_subsets = list(itertools.combinations(list(range(self.num_features)), k))
-                    indices = np.random.choice(len(all_subsets), size=num_interactions, replace=False)
-                    for i in indices:
-                        subset = all_subsets[i]
-                        self.coefficients[subset] = np.random.normal()
-                else:
-                    count = 0
-                    while count < num_interactions:
-                        subset = tuple(np.sort(np.random.choice(self.num_features, size=k, replace=False)))
-                        if subset not in self.coefficients.keys():
-                            self.coefficients[subset] = np.random.normal()
-                            count += 1
+        self.coefficients = coefficients
 
     def shapley_values(self, data: typing.NDArray):
         """
@@ -120,3 +81,54 @@ class RandomMultilinearPolynomial:
                 s += f" * x{feat}"
             s += "\n"
         return s
+
+
+class RandomMultilinearPolynomial(MultilinearPolynomial):
+    def __init__(self, num_features: int, num_terms: List[Union[int, float]],
+                 coefficient_generator: Callable[[], float] = None):
+        """
+        Arguments:
+            num_features: total amount of input features
+            num_terms: List containing the number/fraction of terms of each order.
+                Example: order_terms[3] = the number of desired third-order terms.
+                If order_terms[k] is -1, then all k-order terms are included.
+                If len(order_terms) < num_features, then all entries between len(order_terms) and num_features
+                are assumed to be 0.
+                Example: if len(order_terms) == 3, we will only have a bias, univariate and bivariate terms.
+                If order_terms[k] is a float between 0 and 1, it is interpreted as a relative amount:
+                the fraction of all possible interactions.
+        """
+        coefficient_generator = coefficient_generator if coefficient_generator is not None else np.random.normal
+        coefficients: Dict[Tuple, float] = {}
+        for k in range(len(num_terms)):
+            total_num_interactions = special.comb(num_features, k)
+            if type(num_terms[k]) == int:
+                num_interactions = num_terms[k]
+            else:
+                num_interactions = int(num_terms[k] * total_num_interactions)
+            if num_interactions > total_num_interactions:
+                raise ValueError(f"Cannot have more than {total_num_interactions} terms of order {k}")
+            elif num_interactions == -1:
+                # Add all interactions of order k
+                for comb in itertools.combinations(list(range(num_features)), k):
+                    coefficients[comb] = coefficient_generator()
+            else:
+                # Add the required amount of interactions of order k
+                # If the number of required terms is more than 90% of the total number of terms,
+                # we do this by generating all of them and sampling without replacement.
+                # Otherwise, we sample randomly, throwing out duplicates
+                # (avoids generating ${n \choose order_terms[k]}$ subsets).
+                if num_interactions / total_num_interactions > 0.9:
+                    all_subsets = list(itertools.combinations(list(range(num_features)), k))
+                    indices = np.random.choice(len(all_subsets), size=num_interactions, replace=False)
+                    for i in indices:
+                        subset = all_subsets[i]
+                        coefficients[subset] = coefficient_generator()
+                else:
+                    count = 0
+                    while count < num_interactions:
+                        subset = tuple(np.sort(np.random.choice(num_features, size=k, replace=False)))
+                        if subset not in coefficients.keys():
+                            coefficients[subset] = coefficient_generator()
+                            count += 1
+        super().__init__(num_features, coefficients)

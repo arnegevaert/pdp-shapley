@@ -5,7 +5,6 @@ from pddshap.estimator import PDDEstimator, ConstantEstimator, TreeEstimator, \
 from pddshap.coordinate_generator import CoordinateGenerator, EquidistantGridGenerator
 import numpy as np
 from tqdm import tqdm
-from pddshap.coe import COECalculator
 import pandas as pd
 
 
