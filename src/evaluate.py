@@ -31,31 +31,31 @@ if __name__ == "__main__":
 
     shap_values = {}
     for explainer in ["kernel", "permutation", "sampling"]:
-        with open(os.path.join(args.dir, f"{explainer}.npy"), "rb") as fp:
-            shap_values[explainer] = np.load(fp)
+        p = os.path.join(args.dir, f"{explainer}.npy")
+        if os.path.isfile(p):
+            shap_values[explainer] = np.load(p)
 
-    pdd_shap_values = _get_pdd_output(f"{args.exp_name}/values")
-    pdd_output = _get_pdd_output(f"{args.exp_name}/output")
+    pdd_shap_values = np.load(os.path.join(args.dir, args.exp_name, "values.npy"))
+    pdd_output = np.load(os.path.join(args.dir, args.exp_name, "output.npy"))
 
+    """
     _compare(shap_values["kernel"], shap_values["permutation"], "KernelExplainer", "PermutationExplainer")
     _compare(shap_values["sampling"], shap_values["permutation"], "SamplingExplainer", "PermutationExplainer")
     _compare(shap_values["kernel"], shap_values["sampling"], "KernelExplainer", "SamplingExplainer")
+    """
 
     print("#" * 80)
 
-    keys = sorted(pdd_shap_values.keys())
-    for key in keys:
-        _compare(pdd_shap_values[key], shap_values["sampling"], f"PDD-SHAP: {key}", "SamplingExplainer")
+    _compare(pdd_shap_values, shap_values["permutation"], f"PDD-SHAP", "PermutationExplainer")
 
     with open(os.path.join(args.dir, "meta.json")) as fp:
         meta = json.load(fp)
-    with open(os.path.join(args.dir, "vary_max_dim", "meta.json")) as fp:
+    with open(os.path.join(args.dir, args.exp_name, "meta.json")) as fp:
         pdd_meta = json.load(fp)
 
     print("#" * 80)
     for key in meta["runtime"].keys():
         print(f"{key}: {meta['runtime'][key]:.2f}s")
-    for key in pdd_meta["runtime"].keys():
-        print(f"PDD-SHAP {key}:")
-        print(f"\tTraining: {pdd_meta['runtime'][key]['train']:.2f}s")
-        print(f"\tInference: {pdd_meta['runtime'][key]['inference']:.2f}s")
+    print(f"PDD-SHAP:")
+    print(f"\tTraining: {pdd_meta['runtime']['train']:.2f}s")
+    print(f"\tInference: {pdd_meta['runtime']['inference']:.2f}s")

@@ -17,7 +17,7 @@ from util.datasets import get_ds_metadata
 import json
 import os
 import pickle
-from pddshap import PDDecomposition, RandomSubsampleGenerator
+from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator
 import pandas as pd
 import numpy as np
 
@@ -32,18 +32,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("exp_dir", type=str)
     parser.add_argument("exp_name", type=str)
-    parser.add_argument("--max-value", type=int, default=3)
-    parser.add_argument("--epsilon", type=float, default=None)
+    parser.add_argument("--max-cardinality", type=int, default=None)
+    parser.add_argument("--variance-explained", type=float, default=None)
     parser.add_argument("--project", type=bool, default=True)
-    parser.add_argument("--estimator", type=str, choices=["tree", "forest", "knn"], default="knn")
-    parser.add_argument("-k", type=int, default=None)
+    parser.add_argument("--estimator", type=str, choices=["tree", "forest", "knn"], default="tree")
+    parser.add_argument("-k", type=int, default=None, help="Parameter k for KNN estimator")
     args = parser.parse_args()
 
     subdir = os.path.join(args.exp_dir, args.exp_name)
     if not os.path.isdir(subdir):
         os.makedirs(subdir)
-        os.makedirs(os.path.join(subdir, "output"))
-        os.makedirs(os.path.join(subdir, "values"))
     else:
         raise ValueError(f"Directory {subdir} already exists.")
 
@@ -63,7 +61,7 @@ if __name__ == "__main__":
     print("Done.")
 
     pdd_meta = {
-        "epsilon": args.epsilon,
+        "variance_explained": args.variance_explained,
         "estimator": args.estimator,
         "project": args.project,
         "runtime": {}
@@ -73,29 +71,25 @@ if __name__ == "__main__":
     if args.k is not None:
         est_kwargs["k"] = args.k
 
-    for max_dim in range(1, args.max_value + 1):
-        print(f"max_dim={max_dim}/{args.max_value}")
-        decomposition = PDDecomposition(pred_fn, RandomSubsampleGenerator(), args.estimator, est_kwargs)
+    decomposition = PartialDependenceDecomposition(pred_fn, RandomSubsampleGenerator(), args.estimator, est_kwargs)
 
-        start_t = time.time()
-        decomposition.fit(X_bg, max_dim, args.epsilon)
-        end_t = time.time()
-        fit_time = end_t - start_t
+    start_t = time.time()
+    decomposition.fit(X_bg, args.max_cardinality, args.variance_explained)
+    end_t = time.time()
+    fit_time = end_t - start_t
 
-        start_t = time.time()
-        values = decomposition.shapley_values(X_test, args.project)
-        end_t = time.time()
-        infer_time = end_t - start_t
-        pdd_meta["runtime"][max_dim] = {
-            "train": fit_time,
-            "inference": infer_time
-        }
+    start_t = time.time()
+    values = decomposition.shapley_values(X_test, args.project)
+    end_t = time.time()
+    infer_time = end_t - start_t
+    pdd_meta["runtime"] = {
+        "train": fit_time,
+        "inference": infer_time
+    }
+    output = decomposition(X_test)
 
-        output = decomposition(X_test)
+    np.save(os.path.join(subdir, "values.npy"), values)
+    np.save(os.path.join(subdir, "output.npy"), output)
 
-        with open(os.path.join(subdir, "values", f"{max_dim}.npy"), "wb") as fp:
-            np.save(fp, values)
-        with open(os.path.join(subdir, "output", f"{max_dim}.npy"), "wb") as fp:
-            np.save(fp, output)
     with open(os.path.join(subdir, "meta.json"), "w") as fp:
         json.dump(pdd_meta, fp)

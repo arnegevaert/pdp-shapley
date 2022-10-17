@@ -2,9 +2,8 @@ import numpy as np
 from scipy import special
 import itertools
 from typing import Dict, Tuple, List, Union, Callable
-from numpy import typing
-import matplotlib
-matplotlib.use("TkAgg")
+from numpy import typing as npt
+import pandas as pd
 
 
 class MultilinearPolynomial:
@@ -18,7 +17,7 @@ class MultilinearPolynomial:
         self.num_features = num_features
         self.coefficients = coefficients
 
-    def shapley_values(self, data: typing.NDArray):
+    def shapley_values(self, data: npt.NDArray):
         """
         Computes closed form Shapley values for inputs given by data.
         This assumes that the input features are centered around 0 and independently distributed.
@@ -55,12 +54,14 @@ class MultilinearPolynomial:
             return self.coefficients[()]
         return 0.
 
-    def __call__(self, data: typing.NDArray):
+    def __call__(self, data: npt.NDArray | pd.DataFrame):
         """
         Computes the output of the multilinear polynomial for the given input data
         :param data: NDArray, shape: (num_rows, self.num_features)
         :return: NDArray, shape: (num_rows)
         """
+        if type(data) == pd.DataFrame:
+            data = data.to_numpy()
         assert(data.shape[1] == self.num_features)
         output = np.zeros(shape=(data.shape[0]))
         for term in self.coefficients:
