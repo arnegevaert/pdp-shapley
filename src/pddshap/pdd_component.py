@@ -97,7 +97,7 @@ class ConstantPDDComponent:
     def fit(self, data: np.ndarray, model: Callable[[npt.NDArray], npt.NDArray]):
         avg_output = np.average(model(data), axis=0)
         self.estimator = ConstantEstimator(avg_output)
-        self.num_outputs = avg_output.shape[0]
+        self.num_outputs = avg_output.shape[0] if type(avg_output) == npt.NDArray else 1
 
     def __call__(self, data: np.ndarray):
         return self.estimator(data)

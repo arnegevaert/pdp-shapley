@@ -13,9 +13,8 @@ class CostOfExclusionEstimator:
         self.model = model
         self.shuffled_idx = np.arange(data.shape[0])
         np.random.shuffle(self.shuffled_idx)
-        self.model_evaluations = {
-            (): self.model(self.data[self.shuffled_idx, :])
-        }
+        self.model_evaluations = {}
+        self.model_evaluations[()] = self._get_model_evaluation(())
         random_output = self.model_evaluations[()]
         if len(random_output.shape) == 1:
             self.model_variance = np.var(random_output)
@@ -74,5 +73,7 @@ class CostOfExclusionEstimator:
             data = self.data[self.shuffled_idx, :]
             data[:, feature_set] = self.data[:, feature_set]
             result = self.model(data)
+            if len(result.shape) == 1:
+                result = np.expand_dims(result, axis=1)
             self.model_evaluations[feature_set] = result
             return result

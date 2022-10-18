@@ -11,7 +11,7 @@ np.random.seed(0)
 
 def pdd_shap():
     decomposition = PartialDependenceDecomposition(model, coordinate_generator=RandomSubsampleGenerator(),
-                                                   estimator_type="tree")
+                                                   estimator_type="knn")
     decomposition.fit(X_train, variance_explained=0.99)
     return decomposition, decomposition.shapley_values(X_test, project=True)
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     X_df = pd.DataFrame(X, columns=[f"feat_{i}" for i in range(num_features)])
     # preproc = Preprocessor(X_df, categorical="ordinal")
-    X_train, X_test, y_train, y_test = train_test_split(X_df, y, test_size=0.2)
+    X_train, X_test, y_train, y_test = train_test_split(X_df, y, test_size=0.9)
 
     pdd, pdd_values = report.report_time(pdd_shap, "Using PDD-SHAP...")
     print("Results:")
