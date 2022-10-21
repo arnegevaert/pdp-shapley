@@ -1,14 +1,16 @@
-from typing import Tuple, Callable, Dict, Optional, Union, List
+from typing import Tuple, Callable, Dict, Optional, Union
 from pddshap import PDDEstimator, ConstantEstimator, TreeEstimator, \
-    ForestEstimator, KNNEstimator
+    ForestEstimator, KNNEstimator, FeatureSubset, DataSignature
 import numpy as np
 from numpy import typing as npt
 import pandas as pd
 
 
 class PDDComponent:
-    def __init__(self, features: List[int], coordinate_generator, estimator_type: str, dtypes, categories, est_kwargs) -> None:
-        self.features = features
+    def __init__(self, feature_subset: FeatureSubset, data_signature: DataSignature,
+                 coordinate_generator, estimator_type: str, est_kwargs) -> None:
+        self.data_signature = data_signature
+        self.feature_subset = feature_subset
         self.estimator: Optional[PDDEstimator] = None
         self.std = 0
         self.fitted = False
@@ -19,8 +21,6 @@ class PDDComponent:
         }
         self.est_constructor = est_constructors[estimator_type]
         self.coordinate_generator = coordinate_generator
-        self.dtypes = dtypes
-        self.categories = categories
         self.est_kwargs = est_kwargs
         self.num_outputs = None
 
@@ -34,17 +34,14 @@ class PDDComponent:
         :param model: The model of which we want to compute the partial dependence
         :return: Partial dependence at x. Shape: (num_outputs,)
         """
-        bgd_copy = np.copy(background_distribution)
-        for i, feat in enumerate(self.features):
-            bgd_copy[:, feat] = x[i]
-        output = model(bgd_copy)  # (bgd_copy.shape[0], num_outputs)
+        output = model(self.feature_subset.project(background_distribution, x))  # (num_rows, num_outputs)
         if len(output.shape) == 1:
             # If there is only 1 output, the dimension must be added
-            output = output.reshape(output.shape[0], 1)
+            output = np.expand_dims(output, axis=-1)
         return np.average(output, axis=0)
 
     def fit(self, data: np.ndarray, model: Callable[[np.ndarray], np.ndarray],
-            subcomponents: Dict[Tuple[int], Union["PDDComponent", "ConstantPDDComponent"]]):
+            subcomponents: Dict[FeatureSubset, Union["PDDComponent", "ConstantPDDComponent"]]):
         """
 
         :param data: [n, num_features]
@@ -53,7 +50,9 @@ class PDDComponent:
         :return:
         """
         # Define a grid of values
-        coords = self.coordinate_generator.get_coords(data[:, self.features])
+        # TODO this returns coordinates in the original feature space.
+        #       Not a problem for now, but should be replaced with a more general "Quasi Monte Carlo Integration" class
+        coords = self.coordinate_generator.get_coords(data)
 
         # For each grid value, get partial dependence and subtract proper subset components
         # Shape: (num_rows, num_outputs)
@@ -61,32 +60,30 @@ class PDDComponent:
         partial_dependence = np.array([self._compute_partial_dependence(row, data, model) for row in coords])
         self.num_outputs = partial_dependence.shape[1]
         for subset, subcomponent in subcomponents.items():
-            # Features are given as indices in the full feature space
-            # Derive indices of partial_dependence that correspond to subcomponent features
-            relative_indices = [self.features.index(feat) for feat in subset]
             # Subtract subcomponent from partial dependence
-            partial_dependence -= subcomponent(coords[:, relative_indices])
+            partial_dependence -= subcomponent(coords)
 
         # Fit a model on resulting values
         if np.max(partial_dependence) - np.min(partial_dependence) < 1e-5:
-            # If the partial dependence is constant, don't fit an interpolator
+            # If the partial dependence is constant, don't fit an estimator
             self.estimator = ConstantEstimator(partial_dependence[0])
         else:
             # Otherwise, fit a model
-            self.estimator = self.est_constructor(self.dtypes, self.categories, **self.est_kwargs)
-            self.estimator.fit(coords, partial_dependence)
+            categories = self.data_signature.get_categories(self.feature_subset)
+            self.estimator = self.est_constructor(categories, **self.est_kwargs)
+            self.estimator.fit(self.feature_subset.get_columns(coords), partial_dependence)
         self.fitted = True
 
-    def __call__(self, data: pd.DataFrame) -> npt.NDArray:
+    def __call__(self, data: pd.DataFrame | npt.NDArray) -> npt.NDArray:
         """
-
-        :param data:
+        Computes this component's output on the given data.
+        Note: all columns must be passed in the data. The method extracts the relevant columns.
+        :param data: Shape: (num_rows, len(self.data_signature.feature_names)
         :return: Shape: (data.shape[0], self.num_outputs)
         """
-        # X: [n, len(self.features)]
         if self.estimator is None:
             raise Exception("PDPComponent is not fitted yet")
-        return self.estimator(data)
+        return self.estimator(self.feature_subset.get_columns(data))
 
 
 class ConstantPDDComponent:
@@ -101,4 +98,3 @@ class ConstantPDDComponent:
 
     def __call__(self, data: np.ndarray):
         return self.estimator(data)
-
