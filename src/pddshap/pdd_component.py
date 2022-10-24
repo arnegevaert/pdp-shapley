@@ -4,6 +4,7 @@ from pddshap import PDDEstimator, ConstantEstimator, TreeEstimator, \
 import numpy as np
 from numpy import typing as npt
 import pandas as pd
+from numba import njit
 
 
 class PDDComponent:
@@ -24,21 +25,25 @@ class PDDComponent:
         self.est_kwargs = est_kwargs
         self.num_outputs = None
 
-    def _compute_partial_dependence(self, x: npt.NDArray, background_distribution: npt.NDArray,
+    def _compute_partial_dependence(self, coordinates: npt.NDArray, background_distribution: npt.NDArray,
                                     model: Callable[[npt.NDArray], npt.NDArray]):
         """
         Compute partial dependence of this component at a given point.
-        :param x: The point at which we compute the partial dependence. Shape: (num_features,)
+        :param coordinates: The points at which we compute the partial dependence. Shape: (num_features,)
         :param background_distribution: The background distribution to estimate the integral.
             Shape: (-1, num_features)
         :param model: The model of which we want to compute the partial dependence
         :return: Partial dependence at x. Shape: (num_outputs,)
         """
-        output = model(self.feature_subset.project(background_distribution, x))  # (num_rows, num_outputs)
-        if len(output.shape) == 1:
-            # If there is only 1 output, the dimension must be added
-            output = np.expand_dims(output, axis=-1)
-        return np.average(output, axis=0)
+        result = []
+        for row in coordinates:
+            output = model(self.feature_subset.project(background_distribution, row))  # (background_distribution.shape[0], num_outputs)
+            if len(output.shape) == 1:
+                # If there is only 1 output, the dimension must be added
+                output = np.expand_dims(output, axis=-1)
+            result.append(output)
+        result = np.array(result)
+        return np.average(result, axis=1)
 
     def fit(self, data: np.ndarray, model: Callable[[np.ndarray], np.ndarray],
             subcomponents: Dict[FeatureSubset, Union["PDDComponent", "ConstantPDDComponent"]]):
@@ -49,19 +54,17 @@ class PDDComponent:
         :param subcomponents:
         :return:
         """
-        # Define a grid of values
-        # TODO this returns coordinates in the original feature space.
-        #       Not a problem for now, but should be replaced with a more general "Quasi Monte Carlo Integration" class
-        coords = self.coordinate_generator.get_coords(data)
+
+        # Define coordinates at which we compute the integral
+        coords = self.coordinate_generator.get_coords(self.feature_subset.get_columns(data))
 
         # For each grid value, get partial dependence and subtract proper subset components
         # Shape: (num_rows, num_outputs)
-        # TODO can we use jit compilation to make this faster?
-        partial_dependence = np.array([self._compute_partial_dependence(row, data, model) for row in coords])
+        partial_dependence = self._compute_partial_dependence(coords, data, model)
         self.num_outputs = partial_dependence.shape[1]
         for subset, subcomponent in subcomponents.items():
             # Subtract subcomponent from partial dependence
-            partial_dependence -= subcomponent(coords)
+            partial_dependence -= subcomponent(self.feature_subset.expand_columns(coords, data.shape[1]))
 
         # Fit a model on resulting values
         if np.max(partial_dependence) - np.min(partial_dependence) < 1e-5:
@@ -71,7 +74,7 @@ class PDDComponent:
             # Otherwise, fit a model
             categories = self.data_signature.get_categories(self.feature_subset)
             self.estimator = self.est_constructor(categories, **self.est_kwargs)
-            self.estimator.fit(self.feature_subset.get_columns(coords), partial_dependence)
+            self.estimator.fit(coords, partial_dependence)
         self.fitted = True
 
     def __call__(self, data: pd.DataFrame | npt.NDArray) -> npt.NDArray:

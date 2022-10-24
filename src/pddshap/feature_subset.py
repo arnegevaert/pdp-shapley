@@ -12,8 +12,9 @@ class FeatureSubset:
         Projects the rows in data to the hyperplane defined by the values.
         In practice, this just overwrites the columns corresponding to this feature subset
         using the values given by values.
+        Can be used to compute the partial dependence at a given point for this feature subset.
         :param data: Data to be projected. Shape: (-1, total_num_features)
-        :param values: Values to project the data to. Shape: (total_num_features,)
+        :param values: Values to project the data to. Shape: (len(self.features),)
         :return: Projected data. Shape: (-1, total_num_features)
         """
         # Check shapes
@@ -22,7 +23,7 @@ class FeatureSubset:
         if len(values.shape) != 1:
             raise ValueError("Invalid shape: values:", values.shape)
         data_copy = np.copy(data)
-        data_copy[:, sorted(tuple(self._features))] = values[sorted(tuple(self._features))]
+        data_copy[:, sorted(tuple(self._features))] = values
         return data_copy
 
     def get_columns(self, data: npt.NDArray) -> npt.NDArray:
@@ -34,6 +35,19 @@ class FeatureSubset:
         if len(data.shape) != 2:
             raise ValueError("Invalid shape: data:", data.shape)
         return data[:, sorted(tuple(self._features))]
+
+    def expand_columns(self, data: npt.NDArray, num_cols: int) -> npt.NDArray:
+        """
+        Expands the columns in data to the specified number by adding 0 columns for all the features not in this subset
+        :param num_cols: must be at least len(self.features)
+        :param data: shape: (-1, len(self.features))
+        :return: shape: (-1, total_num_features)
+        """
+        if num_cols < len(self.features):
+            raise ValueError(f"num_cols must be at least {len(self.features)}")
+        result = np.zeros(shape=(data.shape[0], num_cols))
+        result[:, self.features] = data
+        return result
 
     def __contains__(self, item):
         return item in self._features

@@ -1,38 +1,30 @@
 import numpy as np
-import pandas as pd
+from numpy import typing as npt
+from sklearn import cluster
 
 
 class CoordinateGenerator:
-    def get_coords(self, X):
+    def get_coords(self, data: npt.NDArray):
         raise NotImplementedError
-
-
-class EquidistantGridGenerator(CoordinateGenerator):
-    def __init__(self, grid_res):
-        self.grid_res = grid_res
-
-    def get_coords(self, X):
-        # TODO this removes necessary pandas DF information
-        # Meshgrid creates coordinate matrices for each feature
-        mg = np.meshgrid(*[np.linspace(np.min(X[:, i]), np.max(X[:, i]), self.grid_res) for i in range(X.shape[1])])
-        # Convert coordinate matrices to a single matrix containing a row for each grid point
-        return np.vstack(list(map(np.ravel, mg))).transpose()
 
 
 class RandomSubsampleGenerator(CoordinateGenerator):
     def __init__(self, frac=1.0):
         self.frac = frac
 
-    def get_coords(self, X: pd.DataFrame):
+    def get_coords(self, data: npt.NDArray):
         if self.frac < 1.0:
-            return X.sample(frac=self.frac)
-        return X
+            indices = np.random.choice(np.arange(data.shape[0]), replace=False, size=int(data.shape[0] * self.frac))
+            result = data[indices, ...]
+            if len(result.shape) == 1:
+                result = np.expand_dims(result, axis=-1)
+            return result
+        return data
 
 
-# TODO
 class KMeansGenerator(CoordinateGenerator):
-    def __init__(self):
-        pass
+    def __init__(self, k: int):
+        self.k = k
 
-    def get_coords(self, X):
-        pass
+    def get_coords(self, data: npt.NDArray):
+        return cluster.KMeans(n_clusters=self.k).fit(data).cluster_centers_

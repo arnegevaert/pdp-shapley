@@ -23,11 +23,11 @@ class CostOfExclusionEstimator:
             self.model_variance = np.var(random_output, axis=0)
             self.num_outputs = random_output.shape[1]
 
-    def get_significant_feature_sets(self, variance_explained=0.9, max_cardinality=None):
+    def get_significant_feature_sets(self, threshold=0.1, max_cardinality=None):
         """
         Computes all subsets (up to a given cardinality) that should be incorporated in an ANOVA decomposition
         model in order to explain a given fraction of the variance.
-        :param variance_explained: Desired fraction of variance explained by the selected subsets.
+        :param threshold: Threshold for selection of feature subsets.
         :param max_cardinality: Maximal cardinality of subsets.
         :return: Dictionary containing significant subsets for each cardinality: {int: List[Tuple]}
         """
@@ -42,7 +42,7 @@ class CostOfExclusionEstimator:
             cardinality += 1
             # Compute CoE for each of the subsets, include if significant
             result[cardinality] = [subset for subset in candidates
-                                   if self.cost_of_exclusion(subset) > 1 - variance_explained]
+                                   if self.cost_of_exclusion(subset) > threshold]
             # For each combination of 2 significant subsets, we test if the cardinality of the union is equal to
             # the current cardinality + 1. At the end, all subsets with count[subset] == cardinality * (cardinality + 1)
             # are those subsets for which all subsubsets are significant.

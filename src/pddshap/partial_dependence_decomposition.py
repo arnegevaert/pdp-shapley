@@ -1,11 +1,12 @@
 from itertools import combinations
 from typing import Tuple, Callable, Dict, Union, List
 from pddshap import ConstantPDDComponent, PDDComponent, CostOfExclusionEstimator, CoordinateGenerator, \
-    EquidistantGridGenerator, FeatureSubset, DataSignature
+    FeatureSubset, DataSignature
 import numpy as np
 from tqdm import tqdm
 import pandas as pd
 from numpy import typing as npt
+from sklearn import cluster
 
 
 class PartialDependenceDecomposition:
@@ -13,8 +14,6 @@ class PartialDependenceDecomposition:
                  estimator_type: str, est_kwargs=None) -> None:
         self.model = model
         self.components: Dict[FeatureSubset, Union[ConstantPDDComponent, PDDComponent]] = {}
-        if coordinate_generator is None:
-            coordinate_generator = EquidistantGridGenerator(grid_res=10)
         self.coordinate_generator = coordinate_generator
         self.estimator_type = estimator_type
         self.est_kwargs = est_kwargs if est_kwargs is not None else {}
@@ -23,22 +22,26 @@ class PartialDependenceDecomposition:
         self.bg_avg = None
         self.num_outputs = None
 
-    def fit(self, background_data: pd.DataFrame, max_cardinality=None, variance_explained=None) -> None:
+    def fit(self, background_data: pd.DataFrame, max_cardinality: int = None, coe_threshold: float = None,
+            kmeans: int = None) -> None:
         """
         Fit the partial dependence decomposition using a given background dataset.
+        :param kmeans:
         :param background_data:
         :param max_cardinality:
-        :param variance_explained:
+        :param coe_threshold:
         :return:
         """
         self.data_signature = DataSignature(background_data)
         data_np = background_data.to_numpy()
+        if kmeans is not None:
+            data_np = cluster.KMeans(n_clusters=kmeans).fit(data_np).cluster_centers_
         self.bg_avg = np.average(self.model(data_np), axis=0)
 
         significant_feature_sets = None
-        if variance_explained is not None:
+        if coe_threshold is not None:
             coe_estimator = CostOfExclusionEstimator(data_np, self.model)
-            significant_feature_sets = coe_estimator.get_significant_feature_sets(variance_explained, max_cardinality)
+            significant_feature_sets = coe_estimator.get_significant_feature_sets(coe_threshold, max_cardinality)
             max_cardinality = max(significant_feature_sets.keys())
         elif max_cardinality is None:
             max_cardinality = len(self.data_signature.feature_names)

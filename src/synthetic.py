@@ -1,4 +1,4 @@
-from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator
+from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator, KMeansGenerator
 from util import report
 import numpy as np
 import shap
@@ -11,8 +11,8 @@ np.random.seed(0)
 
 def pdd_shap():
     decomposition = PartialDependenceDecomposition(model, coordinate_generator=RandomSubsampleGenerator(),
-                                                   estimator_type="knn")
-    decomposition.fit(X_train, variance_explained=0.99)
+                                                   estimator_type="knn", est_kwargs={"k": 5})
+    decomposition.fit(X_train, coe_threshold=1e-3)
     return decomposition, decomposition.shapley_values(X_test, project=True)
 
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     # Generate input data
     num_features = 10
     mean = np.zeros(num_features)
-    cov = np.diag(np.random.random_sample(num_features))
+    cov = np.diag(np.ones(num_features))
     X = np.random.multivariate_normal(mean, cov, size=1000).astype(np.float32)
 
     model = RandomMultilinearPolynomial(num_features, [-1, -1, 5, 3, 1])
@@ -39,6 +39,8 @@ if __name__ == "__main__":
     print("Results:")
     report.report_metrics(pdd_values, np.expand_dims(model.shapley_values(X_test.to_numpy()), -1))
 
+    """
     perm_values = report.report_time(permutation_shap, "Using PermutationSampler...")
     print("Results:")
     report.report_metrics(perm_values, np.expand_dims(model.shapley_values(X_test.to_numpy()), -1))
+    """
