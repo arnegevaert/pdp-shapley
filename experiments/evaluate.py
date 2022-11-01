@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import os
-from examples.util.eval import correlations, r2_score
+from experiments.util.eval import correlations, r2_score
 import json
 
 

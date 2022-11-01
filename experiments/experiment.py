@@ -1,19 +1,6 @@
-"""
-This script takes an experiment directory (containing output from prerequisites.py), a maximum value for
-max_dim, and fixed values for epsilon, the estimator type, and project (boolean).
-
-It will then train a PDDecomposition with max_dim varying between 1 and max_value and generate Shapley values
-using the background and test sets in the experiment directory for each decomposition. These Shapley values
-are saved to disk in a subdirectory of the experiment directory (exp_name), along with a meta.json file containing
-the hyperparameters and runtime information (training + inference).
-
-TODO this script should be extended to a general-purpose experiment script.
-TODO any experiment (i.e. varying epsilon, varying estimator, etc) would then correspond to a subfolder exp_name
-"""
-
 import argparse
 import time
-from examples.util.datasets import _get_ds_metadata
+from experiments.util.datasets import _get_ds_metadata
 import json
 import os
 import pickle
@@ -28,14 +15,27 @@ def _convert_dtypes(df):
     return df.astype({**int_cols, **float_cols})
 
 
+_DESC = """
+This script takes an experiment directory (containing output from prerequisites.py), a maximum value for
+max_dim, and fixed values for epsilon, the estimator type, and project (boolean).
+
+It will then train a PDDecomposition with max_dim varying between 1 and max_value and generate Shapley values
+using the background and test sets in the experiment directory for each decomposition. These Shapley values
+are saved to disk in a subdirectory of the experiment directory (exp_name), along with a meta.json file containing
+the hyperparameters and runtime information (training + inference).
+"""
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("exp_dir", type=str)
-    parser.add_argument("exp_name", type=str)
-    parser.add_argument("--max-cardinality", type=int, default=None)
-    parser.add_argument("--variance-explained", type=float, default=None)
-    parser.add_argument("--project", type=bool, default=True)
-    parser.add_argument("--estimator", type=str, choices=["tree", "forest", "knn"], default="tree")
+    parser = argparse.ArgumentParser(description=_DESC,
+                                     epilog="Example usage:\n\texperiment.py out/abalone varexp_95 --variance-explained 0.95 --estimator knn -k 3")
+    parser.add_argument("exp_dir", type=str, help="Directory where the output of prerequisites.py was saved")
+    parser.add_argument("exp_name", type=str, help="Name of current experiment. Also name of subdirectory to save the results to.")
+    # TODO max-cardinality, variance-explained, project are unused
+    parser.add_argument("--max-cardinality", type=int, default=None, help="Maximum cardinality of interactions.")
+    parser.add_argument("--coe-threshold", type=float, default=None, help="Cost of Exclusion threshold for deciding if a component should be included.")
+    parser.add_argument("--project", action="store_true", help="If set, use orthogonal projection to force the resulting Shapley values to adhere to the completeness axiom.")
+    parser.add_argument("--estimator", type=str, choices=["tree", "forest", "knn"], default="tree", help="Model to use to estimate PDD components")
     parser.add_argument("-k", type=int, default=None, help="Parameter k for KNN estimator")
     args = parser.parse_args()
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     print("Done.")
 
     pdd_meta = {
-        "variance_explained": args.variance_explained,
+        "coe_threshold": args.coe_threshold,
         "estimator": args.estimator,
         "project": args.project,
         "runtime": {}
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     decomposition = PartialDependenceDecomposition(pred_fn, RandomSubsampleGenerator(), args.estimator, est_kwargs)
 
     start_t = time.time()
-    decomposition.fit(X_bg, args.max_cardinality, args.variance_explained)
+    decomposition.fit(X_bg, args.max_cardinality, args.coe_threshold)
     end_t = time.time()
     fit_time = end_t - start_t
 

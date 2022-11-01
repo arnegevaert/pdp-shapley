@@ -10,16 +10,15 @@ import json
 
 
 _EXPLAINERS = ["kernel", "permutation", "sampling"]
-_DESC = """ This script trains a model, extracts a background distribution and test set,
- and computes Shapley values using existing explainers in the shap library. 
-It then saves the trained model, background distribution, test set, shapley values,
- and metadata to disk at a given location.
+_DESC = """This script trains a model, extracts a background distribution and test set, and computes Shapley values using existing explainers in the shap library. 
+It then saves the trained model, background distribution, test set, shapley values, and metadata to disk at a given location.
 These files are necessary to reproduce experiments."""
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=_DESC,
-        epilog="Example usage: prerequisites.py out/abalone abalone -n 100 -b 100 -e permutation sampling"
+        epilog="Example usage:\n\tprerequisites.py out/abalone abalone -n 100 -b 100 -e permutation sampling",
+        formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("out_dir", type=str, help="Directory where results should be stored")
     parser.add_argument("dataset", type=str, choices=_get_valid_datasets(), help="The dataset to use")
