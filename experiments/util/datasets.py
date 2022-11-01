@@ -10,15 +10,17 @@ _DS_DICT = {
     "credit": {"data_id": 31, "pred_type": "classification"},
     "superconduct": {"data_id": 43174, "pred_type": "regression"},
     "housing": {"data_id": 43939, "pred_type": "regression"},
-    "abalone": {"data_id": 1557, "pred_type": "classification"}
+    "abalone": {"data_id": 1557, "pred_type": "classification"},
+    "digits": {},
+    "mnist": {}
 }
 
 
-def get_ds_metadata(ds_name):
+def _get_ds_metadata(ds_name):
     return _DS_DICT[ds_name]
 
 
-def get_valid_datasets():
+def _get_valid_datasets():
     return _DS_DICT.keys()
 
 

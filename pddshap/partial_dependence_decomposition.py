@@ -1,5 +1,5 @@
 from itertools import combinations
-from typing import Tuple, Callable, Dict, Union, List
+from typing import Tuple, Callable, Dict, Union, List, Optional
 from pddshap import ConstantPDDComponent, PDDComponent, CostOfExclusionEstimator, CoordinateGenerator, \
     FeatureSubset, DataSignature
 import numpy as np
@@ -17,7 +17,7 @@ class PartialDependenceDecomposition:
         self.coordinate_generator = coordinate_generator
         self.estimator_type = estimator_type
         self.est_kwargs = est_kwargs if est_kwargs is not None else {}
-        self.data_signature: DataSignature | None = None
+        self.data_signature: Optional[DataSignature] = None
 
         self.bg_avg = None
         self.num_outputs = None

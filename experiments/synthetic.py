@@ -1,5 +1,5 @@
-from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator, KMeansGenerator
-from util import report
+from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator
+from examples.util import report
 import numpy as np
 import shap
 from synth import RandomMultilinearPolynomial

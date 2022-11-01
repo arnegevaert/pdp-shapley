@@ -10,7 +10,11 @@ setup(
         "pandas",
         "scikit-learn",
         "scipy",
-        "matplotlib",
-        "shap"
-    ]
+    ],
+    extras_require={
+        "dev": [
+            "matplotlib",
+            "shap"
+        ]
+    }
 )

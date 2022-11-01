@@ -13,7 +13,7 @@ TODO any experiment (i.e. varying epsilon, varying estimator, etc) would then co
 
 import argparse
 import time
-from util.datasets import get_ds_metadata
+from examples.util.datasets import _get_ds_metadata
 import json
 import os
 import pickle
@@ -49,7 +49,7 @@ if __name__ == "__main__":
         exp_meta = json.load(fp)
 
     print("Loading data and metadata...")
-    ds_meta = get_ds_metadata(exp_meta["dataset"])
+    ds_meta = _get_ds_metadata(exp_meta["dataset"])
     with open(os.path.join(args.exp_dir, "model.pkl"), "rb") as fp:
         model = pickle.load(fp)
     pred_fn = model.predict_proba if ds_meta["pred_type"] == "classification" else model.predict

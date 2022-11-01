@@ -1,14 +1,14 @@
 import argparse
 import numpy as np
 import os
-from util.eval import get_corrs, get_r2
+from examples.util.eval import correlations, r2_score
 import json
 
 
 def _compare(values1, values2, name1, name2):
     print(f"Comparing {name1} vs {name2}")
-    pearson, spearman = get_corrs(values1, values2)
-    r2 = get_r2(values1, values2)
+    pearson, spearman = correlations(values1, values2)
+    r2 = r2_score(values1, values2)
     print(f"\tPearson correlation: {np.average(pearson):.2f}")
     print(f"\tSpearman correlation: {np.average(spearman):.2f}")
     print(f"\tR2: {np.average(r2):.2f}")
