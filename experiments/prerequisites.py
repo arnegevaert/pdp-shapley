@@ -1,5 +1,5 @@
 import argparse
-from experiments.util.datasets import _get_valid_datasets, get_dataset_model
+from experiments.util.datasets import get_valid_datasets, get_dataset_model
 from experiments.util.shapley_values import compute_shapley_values
 import os
 import numpy as np
@@ -21,7 +21,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("out_dir", type=str, help="Directory where results should be stored")
-    parser.add_argument("dataset", type=str, choices=_get_valid_datasets(), help="The dataset to use")
+    parser.add_argument("dataset", type=str, choices=get_valid_datasets(), help="The dataset to use")
     parser.add_argument("-e", "--explainers", nargs="*", choices=_EXPLAINERS,
                         help="Explainer(s) to use for computing Shapley values")
     parser.add_argument("-n", "--num_test", type=int, default=100, help="Number of test samples")
