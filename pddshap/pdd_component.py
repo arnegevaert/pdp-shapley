@@ -73,7 +73,7 @@ class PDDComponent:
         else:
             # Otherwise, fit a model
             categories = self.data_signature.get_categories(self.feature_subset)
-            self.estimator = self.est_constructor(categories, **self.est_kwargs)
+            self.estimator = self.est_constructor(categories, self.feature_subset, **self.est_kwargs)
             self.estimator.fit(coords, partial_dependence)
         self.fitted = True
 
@@ -95,9 +95,10 @@ class ConstantPDDComponent:
         self.num_outputs = None
 
     def fit(self, data: np.ndarray, model: Callable[[npt.NDArray], npt.NDArray]):
-        avg_output = np.average(model(data), axis=0)
+        output = model(data)
+        self.num_outputs = 1 if len(output.shape) == 1 else output.shape[1]
+        avg_output = np.average(output, axis=0)
         self.estimator = ConstantEstimator(avg_output)
-        self.num_outputs = np.array(avg_output).shape[0]
 
     def __call__(self, data: np.ndarray):
         return self.estimator(data)

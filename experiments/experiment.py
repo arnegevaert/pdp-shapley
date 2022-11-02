@@ -31,7 +31,6 @@ if __name__ == "__main__":
                                      epilog="Example usage:\n\texperiment.py out/abalone varexp_95 --variance-explained 0.95 --estimator knn -k 3")
     parser.add_argument("exp_dir", type=str, help="Directory where the output of prerequisites.py was saved")
     parser.add_argument("exp_name", type=str, help="Name of current experiment. Also name of subdirectory to save the results to.")
-    # TODO max-cardinality, variance-explained, project are unused
     parser.add_argument("--max-cardinality", type=int, default=None, help="Maximum cardinality of interactions.")
     parser.add_argument("--coe-threshold", type=float, default=None, help="Cost of Exclusion threshold for deciding if a component should be included.")
     parser.add_argument("--project", action="store_true", help="If set, use orthogonal projection to force the resulting Shapley values to adhere to the completeness axiom.")

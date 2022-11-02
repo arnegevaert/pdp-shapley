@@ -107,8 +107,6 @@ class PartialDependenceDecomposition:
         for feature_subset, output_vector in pdp_values.items():
             if len(feature_subset) > 0:
                 result[:, feature_subset.features, :] += np.expand_dims(output_vector, axis=1) / len(feature_subset)
-            else:
-                result += np.expand_dims(output_vector, axis=1)
         if project:
             # Orthogonal projection of Shapley values onto hyperplane x_1 + ... + x_d = c
             # where c is the prediction difference

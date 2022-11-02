@@ -59,7 +59,7 @@ class FeatureSubset:
         return iter(sorted(tuple(self._features)))
 
     def __repr__(self):
-        return "FeatureSubset(" + ", ".join(self.features) + ")"
+        return "FeatureSubset(" + ", ".join(map(str, self.features)) + ")"
 
     def __hash__(self):
         return hash(self._features)
