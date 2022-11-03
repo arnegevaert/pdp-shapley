@@ -26,10 +26,10 @@ class PartialDependenceDecomposition:
             kmeans: int = None) -> None:
         """
         Fit the partial dependence decomposition using a given background dataset.
-        :param kmeans:
         :param background_data:
         :param max_cardinality:
         :param coe_threshold:
+        :param kmeans:
         :return:
         """
         self.data_signature = DataSignature(background_data)
