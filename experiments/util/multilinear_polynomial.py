@@ -4,10 +4,11 @@ import itertools
 from typing import Dict, Tuple, List, Union, Callable
 from numpy import typing as npt
 import pandas as pd
+from pddshap import FeatureSubset
 
 
 class MultilinearPolynomial:
-    def __init__(self, num_features: int, coefficients: Dict[Tuple, float]):
+    def __init__(self, num_features: int, coefficients: Dict[FeatureSubset, float]):
         """
         Initialize the multilinear polynomial with a given number of features and coefficients
         :param num_features: Total number of input features.
@@ -51,7 +52,7 @@ class MultilinearPolynomial:
         :return: The theoretical mean (float)
         """
         if () in self.coefficients:
-            return self.coefficients[()]
+            return self.coefficients[FeatureSubset()]
         return 0.
 
     def __call__(self, data: npt.NDArray | pd.DataFrame):
@@ -68,7 +69,7 @@ class MultilinearPolynomial:
             if len(term) == 0:
                 output += self.coefficients[term]  # bias term
             else:
-                output += self.coefficients[term] * np.prod(data[:, term], axis=1)
+                output += self.coefficients[term] * np.prod(data[:, tuple(term)], axis=1)
         return output
 
     def __repr__(self):

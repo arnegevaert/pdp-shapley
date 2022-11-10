@@ -4,7 +4,7 @@ import numpy as np
 
 
 class FeatureSubset:
-    def __init__(self, features: Collection[int] = None):
+    def __init__(self, *features: int):
         self._features = frozenset(features) if features is not None else frozenset()
 
     def project(self, data: npt.NDArray, values: npt.NDArray) -> npt.NDArray:

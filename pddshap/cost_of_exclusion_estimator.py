@@ -43,7 +43,7 @@ class CostOfExclusionEstimator:
         cardinality = 0
         num_columns = self.data.shape[1]
         # Candidates are all subsets for which all subsubsets are significant
-        candidates: List[FeatureSubset] = [FeatureSubset((i,)) for i in range(num_columns)]
+        candidates: List[FeatureSubset] = [FeatureSubset(i) for i in range(num_columns)]
         max_cardinality = max_cardinality if max_cardinality is not None else num_columns
         while len(candidates) > 0 and cardinality < max_cardinality:
             cardinality += 1
@@ -58,11 +58,11 @@ class CostOfExclusionEstimator:
             for set1, set2 in product(result[cardinality], result[cardinality]):
                 union = set1.union(set2)
                 if len(union) == cardinality + 1:
-                    counts[FeatureSubset(union)] += 1
+                    counts[FeatureSubset(*union)] += 1
             candidates = [subset for subset in counts.keys() if counts[subset] == cardinality * (cardinality + 1)]
         return result
 
-    def cost_of_exclusion(self, feature_set: Union[FeatureSubset, Collection], relative=True) -> float:
+    def cost_of_exclusion(self, feature_set: FeatureSubset, relative=True) -> float:
         """
         Estimates cost of exclusion for a given feature subset.
         If the model has multiple outputs, returns the maximal CoE value.
@@ -71,19 +71,17 @@ class CostOfExclusionEstimator:
         :param relative: If true, CoE is returned as a fraction of total variance.
         :return: Estimated CoE.
         """
-        if not isinstance(feature_set, FeatureSubset):
-            feature_set = FeatureSubset(feature_set)
         inner_sum = np.zeros(shape=(self.data.shape[0], self.num_outputs))
         for i in range(len(feature_set) + 1):
             for subset in combinations(feature_set, i):
                 multiplier = 1 if (len(feature_set) - len(subset)) % 2 == 0 else -1
-                inner_sum += multiplier * self._get_model_evaluation(FeatureSubset(subset))
+                inner_sum += multiplier * self._get_model_evaluation(FeatureSubset(*subset))
         coe = np.sum(np.power(inner_sum, 2)) / (self.data.shape[0] * 2**len(feature_set))
         if relative:
             return np.max(coe/self.model_variance)
         return np.max(coe)
 
-    def lower_sobol_index(self, feature_set: [FeatureSubset, Collection], relative=True) -> float:
+    def lower_sobol_index(self, feature_set: FeatureSubset, relative=True) -> float:
         r"""
         Estimates the lower Sobol' index :math:`\underline{\tau}` for a given feature subset.
         Based on Sobol', 1993: Sensitivity Estimates for Non-Linear Mathematical Models
@@ -92,15 +90,27 @@ class CostOfExclusionEstimator:
         :param relative: If true, :math:`\underline{\tau}` is returned as a fraction of total variance.
         :return: Estimated lower Sobol' index.
         """
-        if not isinstance(feature_set, FeatureSubset):
-            feature_set = FeatureSubset(feature_set)
-        orig_output = self._get_model_evaluation(FeatureSubset(self.all_features))
+        orig_output = self._get_model_evaluation(FeatureSubset(*self.all_features))
         shuffled_output = self._get_model_evaluation(feature_set)
         integral = np.average((orig_output * shuffled_output), axis=0)
         sobol = integral - np.average(orig_output)**2
         if relative:
             return np.max(sobol/self.model_variance)
         return np.max(sobol)
+
+    def component_variance(self, feature_set: [FeatureSubset], relative=True) -> float:
+        r"""
+        Uses the lower Sobol' index and the inclusion-exclusion principle to estimate the variance of a given component
+        :param feature_set: The feature set corresponding to the component to be measured
+        :param relative: If True, result is expressed as a fraction of total variance
+        :return: An estimate of the variance of the component
+        """
+        result = 0.
+        for i in range(1,len(feature_set) + 1):
+            for subset in combinations(feature_set, i):
+                multiplier = 1 if (len(feature_set) - len(subset)) % 2 == 0 else -1
+                result += multiplier * self.lower_sobol_index(FeatureSubset(*subset), relative)
+        return result
 
     def _compute_model_evaluation(self, feature_set: FeatureSubset) -> npt.NDArray:
         # Shuffle the data for all indices not in feature_set

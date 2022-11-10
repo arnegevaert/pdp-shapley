@@ -62,7 +62,7 @@ class PartialDependenceDecomposition:
 
                 # Create and fit a PDPComponent for each
                 for feature_comb in tqdm(feature_combs):
-                    feature_subset = FeatureSubset(feature_comb)
+                    feature_subset = FeatureSubset(*feature_comb)
                     # subcomponents contains all PDPComponents for strict subsets of feature_set
                     subcomponents = {k: v for k, v in self.components.items() if all([feat in feature_subset for feat in k])}
                     self.components[feature_subset] = PDDComponent(feature_subset, self.data_signature,
