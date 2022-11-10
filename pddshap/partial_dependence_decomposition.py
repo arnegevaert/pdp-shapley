@@ -1,6 +1,6 @@
 from itertools import combinations
 from typing import Tuple, Callable, Dict, Union, List, Optional
-from pddshap import ConstantPDDComponent, PDDComponent, CostOfExclusionEstimator, CoordinateGenerator, \
+from pddshap import ConstantPDDComponent, PDDComponent, FeatureSubsetSelector, CoordinateGenerator, \
     FeatureSubset, DataSignature
 import numpy as np
 from tqdm import tqdm
@@ -22,55 +22,49 @@ class PartialDependenceDecomposition:
         self.bg_avg = None
         self.num_outputs = None
 
-    def fit(self, background_data: pd.DataFrame, max_cardinality: int = None, coe_threshold: float = None,
+    def fit(self, background_data: pd.DataFrame, max_cardinality: int = None, variance_explained: float = 0.9,
             kmeans: int = None) -> None:
         """
         Fit the partial dependence decomposition using a given background dataset.
         :param background_data:
         :param max_cardinality:
-        :param coe_threshold:
+        :param variance_explained:
         :param kmeans:
         :return:
         """
         self.data_signature = DataSignature(background_data)
         data_np = background_data.to_numpy()
+        # Cluster the background distribution if necessary
         if kmeans is not None:
             data_np = cluster.KMeans(n_clusters=kmeans).fit(data_np).cluster_centers_
         self.bg_avg = np.average(self.model(data_np), axis=0)
 
-        significant_feature_sets = None
-        if coe_threshold is not None:
-            coe_estimator = CostOfExclusionEstimator(data_np, self.model)
-            significant_feature_sets = coe_estimator.get_significant_feature_sets(coe_threshold, max_cardinality)
-            max_cardinality = max(significant_feature_sets.keys())
-        elif max_cardinality is None:
-            max_cardinality = len(self.data_signature.feature_names)
+        # Select subsets to be modeled
+        subset_selector = FeatureSubsetSelector(data_np, self.model)
+        max_cardinality = max_cardinality if max_cardinality is not None else data_np.shape[1]
+        significant_feature_sets = subset_selector.get_significant_feature_sets(variance_explained, max_cardinality)
 
-        # Fit PDP components up to and including dimension max_dim
-        for i in range(max_cardinality + 1):
-            if i == 0:
+        # Model the subsets in order of increasing cardinality
+        for card in significant_feature_sets.keys():
+            if card == 0:
                 self.components[FeatureSubset()] = ConstantPDDComponent()
                 self.components[FeatureSubset()].fit(data_np, self.model)
                 self.num_outputs = self.components[FeatureSubset()].num_outputs
             else:
-                # Get all subsets of given dimensionality
-                feature_combs: List[Tuple]
-                if significant_feature_sets is None:
-                    feature_combs = list(combinations(range(self.data_signature.num_features), i))
-                else:
-                    feature_combs = significant_feature_sets[i]
-
-                # Create and fit a PDPComponent for each
-                for feature_comb in tqdm(feature_combs):
-                    feature_subset = FeatureSubset(*feature_comb)
-                    # subcomponents contains all PDPComponents for strict subsets of feature_set
-                    subcomponents = {k: v for k, v in self.components.items() if all([feat in feature_subset for feat in k])}
-                    self.components[feature_subset] = PDDComponent(feature_subset, self.data_signature,
+                for feature_set in significant_feature_sets[card]:
+                    # All subcomponents are necessary to compute the values for this component
+                    subcomponents = {k: v for k, v in self.components.items() if all([feat in feature_set for feat in k])}
+                    self.components[feature_set] = PDDComponent(feature_set, self.data_signature,
                                                                    self.coordinate_generator, self.estimator_type,
                                                                    self.est_kwargs)
-                    self.components[feature_subset].fit(data_np, self.model, subcomponents)
+                    self.components[feature_set].fit(data_np, self.model, subcomponents)
 
     def __call__(self, data: pd.DataFrame | npt.NDArray):
+        """
+        Compute the output of the decomposition at the given coordinates
+        :param data: The coordinates where we evaluate the model
+        :return: The output of the decomposition at each coordinate.
+        """
         if type(data) == pd.DataFrame:
             data = data.to_numpy()
         pdp_values = self.evaluate(data)

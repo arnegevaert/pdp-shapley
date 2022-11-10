@@ -1,15 +1,16 @@
 import numpy as np
 from itertools import combinations, product
-from typing import Callable, NewType, List, Dict, Union, Collection
+from typing import Callable, NewType, List, Dict
 from numpy import typing as npt
 from collections import defaultdict
+import heapq
 
 from pddshap import FeatureSubset
 
 Model = NewType("Model", Callable[[npt.NDArray], npt.NDArray])
 
 
-class CostOfExclusionEstimator:
+class FeatureSubsetSelector:
     """
     Based on Liu et al. 2006: Estimating Mean Dimensionality of Analysis of Variance Decompositions
     """
@@ -30,37 +31,51 @@ class CostOfExclusionEstimator:
             self.model_variance = np.var(random_output, axis=0)
             self.num_outputs = random_output.shape[1]
 
-    def get_significant_feature_sets(self, threshold=0.1, max_cardinality=None):
+    def get_significant_feature_sets(self, desired_variance_explained, max_cardinality):
         """
         Computes all subsets (up to a given cardinality) that should be incorporated in an ANOVA decomposition
         model in order to explain a given fraction of the variance.
-        :param threshold: Threshold for selection of feature subsets.
+        :param desired_variance_explained: Desired fraction of variance modeled by the components
         :param max_cardinality: Maximal cardinality of subsets.
         :return: Dictionary containing significant subsets for each cardinality: {int: List[Tuple]}
         """
 
-        result: Dict[int, List[FeatureSubset]] = {}
-        cardinality = 0
+        # Maps cardinality to included feature sets of that cardinality
+        result = defaultdict(list)
+        # Empty set should always be included
+        result[0].append(FeatureSubset())
+        # Current fraction of variance explained
+        variance_explained = 0.
         num_columns = self.data.shape[1]
-        # Candidates are all subsets for which all subsubsets are significant
-        candidates: List[FeatureSubset] = [FeatureSubset(i) for i in range(num_columns)]
-        max_cardinality = max_cardinality if max_cardinality is not None else num_columns
-        while len(candidates) > 0 and cardinality < max_cardinality:
-            cardinality += 1
-            # Compute CoE for each of the subsets, include if significant
-            result[cardinality] = [subset for subset in candidates if self.cost_of_exclusion(subset) > threshold]
-            # For each combination of 2 significant subsets, we test if the cardinality of the union is equal to
-            # the current cardinality + 1. At the end, all subsets with count[subset] == cardinality * (cardinality + 1)
-            # are those subsets for which all subsubsets are significant.
-            # These are the candidates for the next iterations.
-            # TODO this could probably happen more efficiently, but it is also not the main bottleneck at this point.
-            counts: Dict[FeatureSubset, int] = defaultdict(lambda: 0)
-            for set1, set2 in product(result[cardinality], result[cardinality]):
-                union = set1.union(set2)
-                if len(union) == cardinality + 1:
-                    counts[FeatureSubset(*union)] += 1
-            candidates = [subset for subset in counts.keys() if counts[subset] == cardinality * (cardinality + 1)]
-        return result
+
+        # Priority queue keeping track of to be modeled components based on their CoE
+        queue = []
+
+        # We start with all singleton subsets
+        for i in range(num_columns):
+            heapq.heappush(queue, (-self.cost_of_exclusion(FeatureSubset(i)), FeatureSubset(i)))
+
+        # subset_counts contains the number of immediate subsets for each feature set that have been included
+        # If all immediate subsets of a feature set are included, then that feature set should be added to the queue
+        subset_counts = defaultdict(lambda: 0)
+
+        # Add subsets in order of decreasing CoE until the desired fraction of variance has been included
+        while variance_explained < desired_variance_explained and len(queue) > 0:
+            # Get the component with largest CoE value, add it to result
+            coe, feature_subset = heapq.heappop(queue)
+            if len(feature_subset) <= max_cardinality:
+                result[len(feature_subset)].append(feature_subset)
+            # Increment subset_counts for each immediate superset of feature_subset
+            for i in range(num_columns):
+                if i not in feature_subset:
+                    superset = FeatureSubset(i, *feature_subset)
+                    subset_counts[superset] += 1
+                    # If all immediate subsets of superset have been included, add superset to queue
+                    if subset_counts[superset] == len(superset):
+                        heapq.heappush(queue, (-self.cost_of_exclusion(superset), superset))
+            # Increase variance explained
+            variance_explained += self.component_variance(feature_subset)
+        return dict(result)
 
     def cost_of_exclusion(self, feature_set: FeatureSubset, relative=True) -> float:
         """

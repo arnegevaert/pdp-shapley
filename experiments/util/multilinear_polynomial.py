@@ -29,7 +29,7 @@ class MultilinearPolynomial:
         result = np.zeros_like(data)
         for term in self.coefficients:
             if len(term) > 0:
-                result[:, term] += (self.coefficients[term] * np.prod(data[:, term], axis=1) / len(term)).reshape(-1, 1)
+                result[:, tuple(term)] += (self.coefficients[term] * np.prod(data[:, tuple(term)], axis=1) / len(term)).reshape(-1, 1)
         return result
 
     def variance(self):
@@ -78,7 +78,9 @@ class MultilinearPolynomial:
             coef = self.coefficients[term]
             if len(s) > 0:
                 s += "+ " if coef > 0 else "- "
-            s += f"{coef if coef > 0 else -coef:.3f}"
+                s += f"{coef if coef > 0 else -coef:.3f}"
+            else:
+                s += f"{coef:.3f}"
             for feat in term:
                 s += f" * x{feat}"
             s += "\n"
