@@ -3,7 +3,7 @@ import joblib
 import glob
 from tqdm import tqdm
 import time
-from experiments.util.datasets import get_ds_metadata
+from experiments.util.datasets import get_ds_metadata, get_pred_type
 import json
 import os
 import pickle
@@ -65,6 +65,7 @@ if __name__ == "__main__":
         ds_data_dir = os.path.join(args.data_dir, ds_name)
         ds_model_dir = os.path.join(ds_data_dir, "models")
         ds_shap_dir = os.path.join(ds_data_dir, "shap")
+        pred_type = get_pred_type(ds_name)
         for variance_explained in args.variance_explained:
             # Create output subdirectory
             dirname = '1' if variance_explained == 1.0 else str(variance_explained).replace('.', '')
@@ -79,6 +80,8 @@ if __name__ == "__main__":
             for model_name in model_names:
                 # Load model
                 model = joblib.load(os.path.join(ds_model_dir, f"{model_name}.pkl"))
+                pred_fn = model.predict_proba if pred_type == "classification" else model.predict
+
                 # Train PDD-SHAP model
                 pass
 

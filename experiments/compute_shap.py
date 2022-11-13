@@ -1,7 +1,7 @@
 import argparse
 import csv
 
-from experiments.util.datasets import get_valid_datasets, get_dataset
+from experiments.util.datasets import get_valid_datasets, get_dataset, get_pred_type
 from experiments.util.shapley_values import compute_shapley_values
 import os
 import numpy as np
@@ -66,7 +66,8 @@ if __name__ == "__main__":
         os.makedirs(ds_shap_dir, exist_ok=True)
         prog.set_postfix({"dataset": ds_name})
         prog.set_description("Loading data...")
-        X_train, X_test, y_train, y_test, pred_type = get_dataset(ds_name, args.out_dir, download=False)
+        X_train, X_test, y_train, y_test = get_dataset(ds_name, args.out_dir, download=False)
+        pred_type = get_pred_type(ds_name)
 
         # Extract background set and save to disk
         num_bg = min(args.num_bg, X_train.shape[0])

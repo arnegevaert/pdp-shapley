@@ -1,6 +1,7 @@
 from sklearn.preprocessing import LabelEncoder, OrdinalEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 import numpy as np
+from numpy import typing as npt
 from sklearn.datasets import fetch_openml
 import pandas as pd
 import os
@@ -49,7 +50,12 @@ def get_valid_datasets():
     return _DS_DICT.keys()
 
 
-def get_dataset(ds_name, data_dir, download=True, force_download=False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, str]:
+def get_pred_type(ds_name):
+    return _DS_DICT[ds_name]["pred_type"]
+
+
+def get_dataset(ds_name, data_dir, download=True, force_download=False)\
+        -> Tuple[pd.DataFrame, pd.DataFrame, npt.NDArray, npt.NDArray]:
     config = _DS_DICT[ds_name]
 
     ds_dir = os.path.join(data_dir, ds_name)
@@ -84,14 +90,14 @@ def get_dataset(ds_name, data_dir, download=True, force_download=False) -> Tuple
         X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2, random_state=42)
         X_train.to_csv(os.path.join(ds_dir, "X_train.csv"))
         X_test.to_csv(os.path.join(ds_dir, "X_test.csv"))
-        y_train.to_csv(os.path.join(ds_dir, "y_train.csv"))
-        y_test.to_csv(os.path.join(ds_dir, "y_test.csv"))
-        return X_train, X_test, y_train, y_test, config["pred_type"]
+        np.savetxt(os.path.join(ds_dir, "y_train.csv"), y_train)
+        np.savetxt(os.path.join(ds_dir, "y_test.csv"), y_test)
+        return X_train, X_test, y_train, y_test
     elif os.path.isdir(ds_dir):
         X_train = pd.read_csv(os.path.join(ds_dir, "X_train.csv"))
         X_test = pd.read_csv(os.path.join(ds_dir, "X_test.csv"))
-        y_train = pd.read_csv(os.path.join(ds_dir, "y_train.csv"))
-        y_test = pd.read_csv(os.path.join(ds_dir, "y_test.csv"))
-        return X_train, X_test, y_train, y_test, config["pred_type"]
+        y_train = np.loadtxt(os.path.join(ds_dir, "y_train.csv"))
+        y_test = np.loadtxt(os.path.join(ds_dir, "y_test.csv"))
+        return X_train, X_test, y_train, y_test
     else:
         raise ValueError(f"Dataset {ds_name} not found. Set download=True to allow downloading from OpenML.")
