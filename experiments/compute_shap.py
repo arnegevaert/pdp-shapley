@@ -37,7 +37,7 @@ if __name__ == "__main__":
                         help="Directory where datasets and models can be found, and where the background distributions"
                              "and Shapley values should be stored. This corresponds to OUT_DIR of train_models.py.")
     parser.add_argument("--datasets", type=str, choices=get_valid_datasets(), nargs="*",
-                        help="The dataset(s) to use. If empty, all dattasets are used.")
+                        help="The dataset(s) to use. By default, all datasets in OUT_DIR are used.")
     parser.add_argument("--explainers", nargs="*", choices=_EXPLAINERS,
                         help="Explainer(s) to use for computing Shapley values."
                              "By default, all explainers are used.")
@@ -73,8 +73,8 @@ if __name__ == "__main__":
         if num_bg < args.num_bg:
             warnings.warn(f"{ds_name} train set only contains {num_bg} rows."
                           f"Using full train set as background set.")
-        X_bg = X_train[np.random.choice(X_train.shape[0], num_bg, replace=False), :]
-        np.savetxt(os.path.join(ds_shap_dir, "X_bg.csv"), X_bg)
+        X_bg = X_train.sample(n=num_bg)
+        X_bg.to_csv(os.path.join(ds_shap_dir, "X_bg.csv"))
 
         # Get test samples and save to disk
         X_test_shap = X_test
@@ -82,8 +82,8 @@ if __name__ == "__main__":
             num_test = min(args.num_test, X_test.shape[0])
             if num_test < args.num_test:
                 warnings.warn(f"{ds_name} test set only contains {num_test} rows. Using full test set.")
-            X_test_shap = X_test[np.random.choice(X_test.shape[0], args.num_test, replace=False), :]
-        np.savetxt(os.path.join(ds_shap_dir, "X_test.csv"), X_test_shap)
+            X_test_shap = X_test.sample(n=num_test)
+        X_test_shap.to_csv(os.path.join(ds_shap_dir, "X_test.csv"))
 
         # For each model and each explainer, compute Shapley values and save to disk
         model_names = args.models if args.models is not None \

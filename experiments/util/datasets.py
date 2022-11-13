@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.datasets import fetch_openml
 import pandas as pd
 import os
+from typing import Tuple
 
 """
 OpenML Benchmarks:
@@ -21,7 +22,6 @@ UCI:
 - https://archive.ics.uci.edu/ml/datasets/Page+Blocks+Classification
 
 """
-
 
 _DS_DICT = {
     "adult": {"data_id": 1590, "pred_type": "classification"},
@@ -49,7 +49,7 @@ def get_valid_datasets():
     return _DS_DICT.keys()
 
 
-def get_dataset(ds_name, data_dir, download=True, force_download=False):
+def get_dataset(ds_name, data_dir, download=True, force_download=False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, str]:
     config = _DS_DICT[ds_name]
 
     ds_dir = os.path.join(data_dir, ds_name)
@@ -80,15 +80,18 @@ def get_dataset(ds_name, data_dir, download=True, force_download=False):
         os.makedirs(ds_dir, exist_ok=True)
         df.to_csv(os.path.join(ds_dir, "data.csv"), index=False)
         np.savetxt(os.path.join(ds_dir, "labels.csv"), y)
+
         X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2, random_state=42)
-        np.savetxt(os.path.join(ds_dir, "X_train.csv"), X_train)
-        np.savetxt(os.path.join(ds_dir, "X_test.csv"), X_test)
-        np.savetxt(os.path.join(ds_dir, "y_train.csv"), y_train)
-        np.savetxt(os.path.join(ds_dir, "y_test.csv"), y_test)
-    elif not (os.path.isdir(ds_dir) or download or force_download):
+        X_train.to_csv(os.path.join(ds_dir, "X_train.csv"))
+        X_test.to_csv(os.path.join(ds_dir, "X_test.csv"))
+        y_train.to_csv(os.path.join(ds_dir, "y_train.csv"))
+        y_test.to_csv(os.path.join(ds_dir, "y_test.csv"))
+        return X_train, X_test, y_train, y_test, config["pred_type"]
+    elif os.path.isdir(ds_dir):
+        X_train = pd.read_csv(os.path.join(ds_dir, "X_train.csv"))
+        X_test = pd.read_csv(os.path.join(ds_dir, "X_test.csv"))
+        y_train = pd.read_csv(os.path.join(ds_dir, "y_train.csv"))
+        y_test = pd.read_csv(os.path.join(ds_dir, "y_test.csv"))
+        return X_train, X_test, y_train, y_test, config["pred_type"]
+    else:
         raise ValueError(f"Dataset {ds_name} not found. Set download=True to allow downloading from OpenML.")
-    X_train = np.loadtxt(os.path.join(ds_dir, "X_train.csv"))
-    X_test = np.loadtxt(os.path.join(ds_dir, "X_test.csv"))
-    y_train = np.loadtxt(os.path.join(ds_dir, "y_train.csv"))
-    y_test = np.loadtxt(os.path.join(ds_dir, "y_test.csv"))
-    return X_train, X_test, y_train, y_test, config["pred_type"]
