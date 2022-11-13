@@ -88,8 +88,8 @@ def get_dataset(ds_name, data_dir, download=True, force_download=False)\
         np.savetxt(os.path.join(ds_dir, "labels.csv"), y)
 
         X_train, X_test, y_train, y_test = train_test_split(df, y, test_size=0.2, random_state=42)
-        X_train.to_csv(os.path.join(ds_dir, "X_train.csv"))
-        X_test.to_csv(os.path.join(ds_dir, "X_test.csv"))
+        X_train.to_csv(os.path.join(ds_dir, "X_train.csv"), index=False)
+        X_test.to_csv(os.path.join(ds_dir, "X_test.csv"), index=False)
         np.savetxt(os.path.join(ds_dir, "y_train.csv"), y_train)
         np.savetxt(os.path.join(ds_dir, "y_test.csv"), y_test)
         return X_train, X_test, y_train, y_test

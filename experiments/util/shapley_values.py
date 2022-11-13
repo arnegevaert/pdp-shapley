@@ -3,11 +3,7 @@ import pandas as pd
 import numpy as np
 
 
-def compute_shapley_values(pred_fn, X_bg, X, explainer: str):
-    if type(X_bg) == pd.DataFrame:
-        X_bg = X_bg.to_numpy()
-    if type(X) == pd.DataFrame:
-        X = X.to_numpy()
+def compute_shapley_values(pred_fn, X_bg: pd.DataFrame, X: pd.DataFrame, explainer: str):
     if explainer == "permutation":
         explainer = PermutationExplainer(pred_fn, X_bg)
         values = explainer(X).values

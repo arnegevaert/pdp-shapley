@@ -11,7 +11,7 @@ import warnings
 import glob
 import joblib
 
-_EXPLAINERS = ["permutation", "sampling"]
+_EXPLAINERS = ["permutation"]
 
 _DESC = """
 This script extracts a background distribution from the training set and computes Shapley values on the test set
@@ -75,7 +75,7 @@ if __name__ == "__main__":
             warnings.warn(f"{ds_name} train set only contains {num_bg} rows."
                           f"Using full train set as background set.")
         X_bg = X_train.sample(n=num_bg)
-        X_bg.to_csv(os.path.join(ds_shap_dir, "X_bg.csv"))
+        X_bg.to_csv(os.path.join(ds_shap_dir, "X_bg.csv"), index=False)
 
         # Get test samples and save to disk
         X_test_shap = X_test
@@ -84,7 +84,7 @@ if __name__ == "__main__":
             if num_test < args.num_test:
                 warnings.warn(f"{ds_name} test set only contains {num_test} rows. Using full test set.")
             X_test_shap = X_test.sample(n=num_test)
-        X_test_shap.to_csv(os.path.join(ds_shap_dir, "X_test.csv"))
+        X_test_shap.to_csv(os.path.join(ds_shap_dir, "X_test.csv"), index=False)
 
         # For each model and each explainer, compute Shapley values and save to disk
         model_names = args.models if args.models is not None \
