@@ -85,11 +85,10 @@ def get_dataset(ds_name, data_dir, download=True, force_download=False):
         np.savetxt(os.path.join(ds_dir, "X_test.csv"), X_test)
         np.savetxt(os.path.join(ds_dir, "y_train.csv"), y_train)
         np.savetxt(os.path.join(ds_dir, "y_test.csv"), y_test)
-    elif os.path.isdir(ds_dir):
-        X_train = np.loadtxt(os.path.join(ds_dir, "X_train.csv"))
-        X_test = np.loadtxt(os.path.join(ds_dir, "X_test.csv"))
-        y_train = np.loadtxt(os.path.join(ds_dir, "y_train.csv"))
-        y_test = np.loadtxt(os.path.join(ds_dir, "y_test.csv"))
-    else:
+    elif not (os.path.isdir(ds_dir) or download or force_download):
         raise ValueError(f"Dataset {ds_name} not found. Set download=True to allow downloading from OpenML.")
+    X_train = np.loadtxt(os.path.join(ds_dir, "X_train.csv"))
+    X_test = np.loadtxt(os.path.join(ds_dir, "X_test.csv"))
+    y_train = np.loadtxt(os.path.join(ds_dir, "y_train.csv"))
+    y_test = np.loadtxt(os.path.join(ds_dir, "y_test.csv"))
     return X_train, X_test, y_train, y_test, config["pred_type"]
