@@ -49,10 +49,10 @@ def get_valid_datasets():
     return _DS_DICT.keys()
 
 
-def get_dataset(ds_name, download=True, location="./data", force_download=False):
+def get_dataset(ds_name, data_dir, download=True, force_download=False):
     config = _DS_DICT[ds_name]
 
-    ds_dir = os.path.join(location, ds_name)
+    ds_dir = os.path.join(data_dir, ds_name)
     if (not os.path.isdir(ds_dir) and download) or force_download:
         # Get dataset from OpenML
         ds = fetch_openml(data_id=config["data_id"])
@@ -86,7 +86,6 @@ def get_dataset(ds_name, download=True, location="./data", force_download=False)
         np.savetxt(os.path.join(ds_dir, "y_train.csv"), y_train)
         np.savetxt(os.path.join(ds_dir, "y_test.csv"), y_test)
     elif os.path.isdir(ds_dir):
-        print(ds_dir)
         X_train = np.loadtxt(os.path.join(ds_dir, "X_train.csv"))
         X_test = np.loadtxt(os.path.join(ds_dir, "X_test.csv"))
         y_train = np.loadtxt(os.path.join(ds_dir, "y_train.csv"))

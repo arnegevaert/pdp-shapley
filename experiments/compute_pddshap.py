@@ -16,7 +16,7 @@ def _convert_dtypes(df):
 
 
 _DESC = """
-This script takes an experiment directory (containing output from prerequisites.py), a maximum value for
+This script takes an experiment directory (containing output from compute_shap.py), a maximum value for
 max_dim, and fixed values for epsilon, the estimator type, and project (boolean).
 
 It will then train a PDDecomposition with max_dim varying between 1 and max_value and generate Shapley values
@@ -28,8 +28,8 @@ the hyperparameters and runtime information (training + inference).
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=_DESC,
-                                     epilog="Example usage:\n\texperiment.py out/abalone varexp_95 --variance-explained 0.95 --estimator knn -k 3")
-    parser.add_argument("exp_dir", type=str, help="Directory where the output of prerequisites.py was saved")
+                                     epilog="Example usage:\n\tcompute_pddshap.py out/abalone varexp_95 --variance-explained 0.95 --estimator knn -k 3")
+    parser.add_argument("exp_dir", type=str, help="Directory where the output of compute_shap.py was saved")
     parser.add_argument("exp_name", type=str, help="Name of current experiment. Also name of subdirectory to save the results to.")
     parser.add_argument("--max-cardinality", type=int, default=None, help="Maximum cardinality of interactions.")
     parser.add_argument("--coe-threshold", type=float, default=None, help="Cost of Exclusion threshold for deciding if a component should be included.")

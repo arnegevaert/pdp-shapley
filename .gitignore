@@ -1,6 +1,3 @@
-data
-models
-
 # Created by https://www.toptal.com/developers/gitignore/api/python,virtualenv
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,virtualenv
 
@@ -204,3 +201,4 @@ data/*
 tmp/
 out/
 results/
+data
