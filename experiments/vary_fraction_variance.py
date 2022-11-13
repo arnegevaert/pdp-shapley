@@ -1,12 +1,12 @@
 import argparse
+import csv
+
 import joblib
 import glob
 from tqdm import tqdm
 import time
-from experiments.util.datasets import get_ds_metadata, get_pred_type
-import json
+from experiments.util.datasets import get_pred_type
 import os
-import pickle
 from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator
 import pandas as pd
 import numpy as np
@@ -28,7 +28,7 @@ For each fraction of variance x.yyy and model, the results are saved in OUT_DIR/
 For example: for dataset adult, fraction of variance 0.95 and model knn, results are saved in OUT_DIR/adult/knn/095.
 
 For each dataset, runtimes are saved in OUT_DIR/DATASET_NAME/runtimes.csv.
-This file contains the runtime for training and inference separately, for each fraction of variance.
+This file contains the runtime for training and inference separately, for each model and fraction of variance.
 """
 
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
                         help="Directory where the output of compute_shap.py was saved.")
     parser.add_argument("-o", "--out-dir", type=str, default="./out",
                         help="Output directory where results should be stored.")
-    parser.add_argument("-e", "--variance-explained", type=float, nargs="*", default=0.9,
+    parser.add_argument("-e", "--variance-explained", type=float, nargs="*", default=[0.9],
                         help="The different fractions of variance explained. Default: 0.9."
                              "This argument can take multiple values.")
     parser.add_argument("--datasets", type=str, nargs="*",
@@ -62,81 +62,53 @@ if __name__ == "__main__":
     prog = tqdm(datasets)
     for ds_name in prog:
         ds_out_dir = os.path.join(args.out_dir, ds_name)
+        os.makedirs(ds_out_dir, exist_ok=True)
         ds_data_dir = os.path.join(args.data_dir, ds_name)
         ds_model_dir = os.path.join(ds_data_dir, "models")
         ds_shap_dir = os.path.join(ds_data_dir, "shap")
         pred_type = get_pred_type(ds_name)
-        for variance_explained in args.variance_explained:
-            # Create output subdirectory
-            dirname = '1' if variance_explained == 1.0 else str(variance_explained).replace('.', '')
-            var_out_dir = os.path.join(ds_out_dir, dirname)
-            os.makedirs(var_out_dir, exist_ok=True)
 
-            # Load background and test datasets
-            X_bg = _convert_dtypes(pd.read_csv(os.path.join(ds_shap_dir, "X_bg.csv")))
-            X_test = _convert_dtypes(pd.read_csv(os.path.join(ds_shap_dir, "X_test.csv")))
-
-            model_names = [os.path.basename(fn)[:-4] for fn in glob.glob(os.path.join(ds_model_dir, "*.pkl"))]
+        model_names = [os.path.basename(fn)[:-4] for fn in glob.glob(os.path.join(ds_model_dir, "*.pkl"))]
+        with open(os.path.join(ds_out_dir, "runtimes.csv"), "w") as runtime_fp:
+            writer = csv.DictWriter(runtime_fp, ["model", "fraction", "training", "inference"])
+            writer.writeheader()
             for model_name in model_names:
                 # Load model
                 model = joblib.load(os.path.join(ds_model_dir, f"{model_name}.pkl"))
                 pred_fn = model.predict_proba if pred_type == "classification" else model.predict
 
-                # Train PDD-SHAP model
-                pass
+                for variance_explained in args.variance_explained:
+                    # Create output subdirectory
+                    dirname = '1' if variance_explained == 1.0 else str(variance_explained).replace('.', '')
+                    var_out_dir = os.path.join(ds_out_dir, model_name, dirname)
+                    os.makedirs(var_out_dir, exist_ok=True)
 
-                # Estimate Shapley values on the test set
-                pass
+                    # Load background and test datasets
+                    X_bg = _convert_dtypes(pd.read_csv(os.path.join(ds_shap_dir, "X_bg.csv")))
+                    X_test = _convert_dtypes(pd.read_csv(os.path.join(ds_shap_dir, "X_test.csv")))
 
-                # Save results to disk and write timings to csv
-                pass
+                    # Train PDD-SHAP model
+                    est_kwargs = {}
+                    if args.k is not None:
+                        est_kwargs["k"] = args.k
+                    decomposition = PartialDependenceDecomposition(pred_fn, RandomSubsampleGenerator(),
+                                                                   args.estimator, est_kwargs)
+                    start_t = time.time()
+                    decomposition.fit(X_bg, variance_explained=variance_explained)
+                    end_t = time.time()
+                    fit_time = end_t - start_t
 
+                    # Estimate Shapley values on the test set
+                    start_t = time.time()
+                    values = decomposition.shapley_values(X_test)
+                    end_t = time.time()
+                    infer_time = end_t - start_t
 
-    with open(os.path.join(args.exp_dir, "meta.json")) as fp:
-        exp_meta = json.load(fp)
+                    # Get surrogate model output on test set
+                    output = decomposition(X_test)
 
-    print("Loading data and metadata...")
-    ds_meta = get_ds_metadata(exp_meta["dataset"])
-    with open(os.path.join(args.exp_dir, "model.pkl"), "rb") as fp:
-        model = pickle.load(fp)
-    pred_fn = model.predict_proba if ds_meta["pred_type"] == "classification" else model.predict
-
-    X_bg = pd.read_csv(os.path.join(args.exp_dir, "X_bg.csv"))
-    X_test = pd.read_csv(os.path.join(args.exp_dir, "X_test.csv"))
-    X_bg = _convert_dtypes(X_bg)
-    X_test = _convert_dtypes(X_test)
-    print("Done.")
-
-    pdd_meta = {
-        "coe_threshold": args.coe_threshold,
-        "estimator": args.estimator,
-        "project": args.project,
-        "runtime": {}
-    }
-
-    est_kwargs = {}
-    if args.k is not None:
-        est_kwargs["k"] = args.k
-
-    decomposition = PartialDependenceDecomposition(pred_fn, RandomSubsampleGenerator(), args.estimator, est_kwargs)
-
-    start_t = time.time()
-    decomposition.fit(X_bg, args.max_cardinality, args.coe_threshold)
-    end_t = time.time()
-    fit_time = end_t - start_t
-
-    start_t = time.time()
-    values = decomposition.shapley_values(X_test, args.project)
-    end_t = time.time()
-    infer_time = end_t - start_t
-    pdd_meta["runtime"] = {
-        "train": fit_time,
-        "inference": infer_time
-    }
-    output = decomposition(X_test)
-
-    np.save(os.path.join(subdir, "values.npy"), values)
-    np.save(os.path.join(subdir, "output.npy"), output)
-
-    with open(os.path.join(subdir, "meta.json"), "w") as fp:
-        json.dump(pdd_meta, fp)
+                    # Save results to disk and write timings to csv
+                    writer.writerow({"model": model_name, "fraction": variance_explained,
+                                     "training": fit_time, "inference": infer_time})
+                    np.save(os.path.join(var_out_dir, "values.npy"), values)
+                    np.save(os.path.join(var_out_dir, "output.npy"), output)

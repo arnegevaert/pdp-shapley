@@ -103,7 +103,7 @@ if __name__ == "__main__":
                 writer.writeheader()
                 for explainer in explainers:
                     start_t = time.time()
-                    values = compute_shapley_values(pred_fn, X_bg, X_test_shap, explainer)
+                    values = compute_shapley_values(pred_fn, X_bg.to_numpy(), X_test_shap.to_numpy(), explainer)
                     end_t = time.time()
                     writer.writerow({"explainer": explainer, "runtime (s)": end_t - start_t})
                     # We save to .npy instead of .csv because the output is 3-dimensional (row, column, output)

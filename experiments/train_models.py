@@ -61,10 +61,10 @@ if __name__ == "__main__":
             for model_name in models:
                 prog.set_description(f"Training {model_name}...")
                 model = _MODEL_DICT[pred_type][model_name]()
-                model.fit(X_train, y_train)
+                model.fit(X_train.to_numpy(), y_train)
 
                 prog.set_description(f"Testing {model_name}...")
-                y_pred = model.predict(X_test)
+                y_pred = model.predict(X_test.to_numpy())
                 score = balanced_accuracy_score(y_test, y_pred) if pred_type == "classification" else r2_score(y_test, y_pred)
                 writer.writerow({"model": model_name, "score": score})
 
