@@ -40,7 +40,8 @@ class PartialDependenceDecomposition:
         self.bg_avg = np.average(self.model(data_np), axis=0)
 
         # Select subsets to be modeled
-        subset_selector = FeatureSubsetSelector(train_data.to_numpy(), self.model)
+        #subset_selector = FeatureSubsetSelector(train_data.to_numpy(), self.model)
+        subset_selector = FeatureSubsetSelector(data_np, self.model)
         max_cardinality = max_cardinality if max_cardinality is not None else data_np.shape[1]
         significant_feature_sets = subset_selector.get_significant_feature_sets(variance_explained, max_cardinality)
 
