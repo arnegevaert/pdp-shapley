@@ -5,7 +5,7 @@ import joblib
 import glob
 from tqdm import tqdm
 import time
-from experiments.util.datasets import get_pred_type
+from experiments.util.datasets import get_pred_type, get_dataset
 import os
 from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator
 import pandas as pd
@@ -80,10 +80,12 @@ if __name__ == "__main__":
                 for variance_explained in args.variance_explained:
                     # Create output subdirectory
                     dirname = '1' if variance_explained == 1.0 else str(variance_explained).replace('.', '')
+                    print(dirname)
                     var_out_dir = os.path.join(ds_out_dir, model_name, dirname)
                     os.makedirs(var_out_dir, exist_ok=True)
 
-                    # Load background and test datasets
+                    # Load datasets
+                    X_train, _, _, _ = get_dataset(ds_name, args.data_dir, download=False)
                     X_bg = _convert_dtypes(pd.read_csv(os.path.join(ds_shap_dir, "X_bg.csv")))
                     X_test = _convert_dtypes(pd.read_csv(os.path.join(ds_shap_dir, "X_test.csv")))
 
@@ -94,7 +96,7 @@ if __name__ == "__main__":
                     decomposition = PartialDependenceDecomposition(pred_fn, RandomSubsampleGenerator(),
                                                                    args.estimator, est_kwargs)
                     start_t = time.time()
-                    decomposition.fit(X_bg, variance_explained=variance_explained)
+                    decomposition.fit(X_bg, X_train, variance_explained=variance_explained)
                     end_t = time.time()
                     fit_time = end_t - start_t
 

@@ -22,11 +22,11 @@ class DataSignature:
 
         if type(dataframe) == pd.DataFrame:
             self.feature_names = tuple(dataframe.columns)
-            illegal_dtypes = [dt not in ["int8", "float32", "float64"] for col, dt in dataframe.dtypes.items()]
+            illegal_dtypes = [dt not in ["int8", "int64", "float32", "float64"] for col, dt in dataframe.dtypes.items()]
             if any(illegal_dtypes) > 0:
                 raise ValueError("Encode categorical values as int8 and numerical as float32 or float64")
             for i, feat_name in enumerate(self.feature_names):
-                if dataframe.dtypes[i] == "int8":
+                if dataframe.dtypes[i] in ["int8", "int64"]:
                     self.categories[i] = list(range(dataframe[feat_name].max() + 1))
         else:
             self.feature_names = tuple(str(i) for i in range(dataframe.shape[1]))
