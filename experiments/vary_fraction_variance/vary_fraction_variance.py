@@ -45,6 +45,8 @@ if __name__ == "__main__":
                         help="Datasets to use. By default, all datasets in DATA_DIR will be used.")
     parser.add_argument("--estimator", type=str, choices=["tree", "forest", "knn"], default="tree",
                         help="Model to use to estimate PDD components")
+    parser.add_argument("--models", type=str, nargs="*",
+                        help="Models to use. By default, all available models will be used.")
     parser.add_argument("-k", type=int, default=None,
                         help="Parameter k for KNN estimator. Ignored if estimator is not knn.")
     args = parser.parse_args()
@@ -68,7 +70,9 @@ if __name__ == "__main__":
         ds_shap_dir = os.path.join(ds_data_dir, "shap")
         pred_type = get_pred_type(ds_name)
 
-        model_names = [os.path.basename(fn)[:-4] for fn in glob.glob(os.path.join(ds_model_dir, "*.pkl"))]
+        model_names = args.models
+        if model_names is None:
+            model_names = [os.path.basename(fn)[:-4] for fn in glob.glob(os.path.join(ds_model_dir, "*.pkl"))]
         with open(os.path.join(ds_out_dir, "runtimes.csv"), "w") as runtime_fp:
             writer = csv.DictWriter(runtime_fp, ["model", "fraction", "training", "inference"])
             writer.writeheader()
