@@ -50,7 +50,7 @@ class FeatureSubset:
         return result
 
     def union(self, other: "FeatureSubset") -> "FeatureSubset":
-        return FeatureSubset(self._features.union(other._features))
+        return FeatureSubset(*self._features.union(other._features))
 
     def __contains__(self, item):
         return item in self._features
@@ -69,6 +69,21 @@ class FeatureSubset:
 
     def __eq__(self, other):
         return type(other) == FeatureSubset and other.features == self.features
+
+    def __ne__(self, other):
+        return self != other
+
+    def __lt__(self, other):
+        return self.features < other.features
+
+    def __gt__(self, other):
+        return self.features > other.features
+
+    def __le__(self, other):
+        return self.features <= other.features
+
+    def __ge__(self, other):
+        return self.features >= other.features
 
     @property
     def features(self):
