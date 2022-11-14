@@ -22,7 +22,7 @@ class PartialDependenceDecomposition:
         self.bg_avg = None
         self.num_outputs = None
 
-    def fit(self, background_data: pd.DataFrame, max_cardinality: int = None, variance_explained: float = 0.9,
+    def fit(self, background_data: pd.DataFrame, train_data: pd.DataFrame, max_cardinality: int = None, variance_explained: float = 0.9,
             kmeans: int = None) -> None:
         """
         Fit the partial dependence decomposition using a given background dataset.
@@ -32,7 +32,7 @@ class PartialDependenceDecomposition:
         :param kmeans:
         :return:
         """
-        self.data_signature = DataSignature(background_data)
+        self.data_signature = DataSignature(train_data)
         data_np = background_data.to_numpy()
         # Cluster the background distribution if necessary
         if kmeans is not None:
@@ -40,7 +40,7 @@ class PartialDependenceDecomposition:
         self.bg_avg = np.average(self.model(data_np), axis=0)
 
         # Select subsets to be modeled
-        subset_selector = FeatureSubsetSelector(data_np, self.model)
+        subset_selector = FeatureSubsetSelector(train_data.to_numpy(), self.model)
         max_cardinality = max_cardinality if max_cardinality is not None else data_np.shape[1]
         significant_feature_sets = subset_selector.get_significant_feature_sets(variance_explained, max_cardinality)
 

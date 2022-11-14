@@ -44,8 +44,8 @@ class FeatureSubsetSelector:
         result = defaultdict(list)
         # Empty set should always be included
         result[0].append(FeatureSubset())
-        # Current fraction of variance explained
-        variance_explained = 0.
+        # Current fraction of variance explained for each output
+        variance_explained = np.zeros(self.num_outputs)
         num_columns = self.data.shape[1]
 
         # Priority queue keeping track of to be modeled components based on their CoE
@@ -53,14 +53,16 @@ class FeatureSubsetSelector:
 
         # We start with all singleton subsets
         for i in range(num_columns):
-            heapq.heappush(queue, (-self.cost_of_exclusion(FeatureSubset(i)), FeatureSubset(i)))
+            # The priority value is the largest CoE over all outputs
+            coe = np.min(-self.cost_of_exclusion(FeatureSubset(i)))
+            heapq.heappush(queue, (coe, FeatureSubset(i)))
 
         # subset_counts contains the number of immediate subsets for each feature set that have been included
         # If all immediate subsets of a feature set are included, then that feature set should be added to the queue
         subset_counts = defaultdict(lambda: 0)
 
         # Add subsets in order of decreasing CoE until the desired fraction of variance has been included
-        while variance_explained < desired_variance_explained and len(queue) > 0:
+        while np.any(variance_explained < desired_variance_explained) and len(queue) > 0:
             # Get the component with largest CoE value, add it to result
             coe, feature_subset = heapq.heappop(queue)
             if len(feature_subset) <= max_cardinality:
@@ -72,12 +74,14 @@ class FeatureSubsetSelector:
                     subset_counts[superset] += 1
                     # If all immediate subsets of superset have been included, add superset to queue
                     if subset_counts[superset] == len(superset):
-                        heapq.heappush(queue, (-self.cost_of_exclusion(superset), superset))
+                        # Ignore CoE values for outputs that have been sufficiently modeled
+                        coe = np.min(-self.cost_of_exclusion(superset)[variance_explained < desired_variance_explained])
+                        heapq.heappush(queue, (coe, superset))
             # Increase variance explained
-            variance_explained += self.component_variance(feature_subset)
+            variance_explained += self.component_variance(feature_subset, relative=True)
         return dict(result)
 
-    def cost_of_exclusion(self, feature_set: FeatureSubset, relative=True) -> float:
+    def cost_of_exclusion(self, feature_set: FeatureSubset, relative=True) -> npt.NDArray:
         """
         Estimates cost of exclusion for a given feature subset.
         If the model has multiple outputs, returns the maximal CoE value.
@@ -91,12 +95,12 @@ class FeatureSubsetSelector:
             for subset in combinations(feature_set, i):
                 multiplier = 1 if (len(feature_set) - len(subset)) % 2 == 0 else -1
                 inner_sum += multiplier * self._get_model_evaluation(FeatureSubset(*subset))
-        coe = np.sum(np.power(inner_sum, 2)) / (self.data.shape[0] * 2**len(feature_set))
+        coe = np.sum(np.power(inner_sum, 2), axis=0) / (self.data.shape[0] * 2**len(feature_set))
         if relative:
-            return np.max(coe/self.model_variance)
-        return np.max(coe)
+            return coe/self.model_variance
+        return coe
 
-    def lower_sobol_index(self, feature_set: FeatureSubset, relative=True) -> float:
+    def lower_sobol_index(self, feature_set: FeatureSubset, relative=True) -> npt.NDArray:
         r"""
         Estimates the lower Sobol' index :math:`\underline{\tau}` for a given feature subset.
         Based on Sobol', 1993: Sensitivity Estimates for Non-Linear Mathematical Models
@@ -108,20 +112,20 @@ class FeatureSubsetSelector:
         orig_output = self._get_model_evaluation(FeatureSubset(*self.all_features))
         shuffled_output = self._get_model_evaluation(feature_set)
         integral = np.average((orig_output * shuffled_output), axis=0)
-        sobol = integral - np.average(orig_output)**2
+        sobol = integral - np.average(orig_output, axis=0)**2
         if relative:
-            return np.max(sobol/self.model_variance)
-        return np.max(sobol)
+            return sobol/self.model_variance
+        return sobol
 
-    def component_variance(self, feature_set: [FeatureSubset], relative=True) -> float:
+    def component_variance(self, feature_set: [FeatureSubset], relative=True) -> npt.NDArray:
         r"""
         Uses the lower Sobol' index and the inclusion-exclusion principle to estimate the variance of a given component
         :param feature_set: The feature set corresponding to the component to be measured
         :param relative: If True, result is expressed as a fraction of total variance
         :return: An estimate of the variance of the component
         """
-        result = 0.
-        for i in range(1,len(feature_set) + 1):
+        result = np.zeros(self.num_outputs)
+        for i in range(1, len(feature_set) + 1):
             for subset in combinations(feature_set, i):
                 multiplier = 1 if (len(feature_set) - len(subset)) % 2 == 0 else -1
                 result += multiplier * self.lower_sobol_index(FeatureSubset(*subset), relative)
