@@ -1,7 +1,7 @@
-from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator, FeatureSubset
+from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator
 from experiments.util import eval
 import numpy as np
-from experiments.util.multilinear_polynomial import RandomMultilinearPolynomial, MultilinearPolynomial
+from experiments.synthetic.multilinear_polynomial import RandomMultilinearPolynomial
 import pandas as pd
 from sklearn.model_selection import train_test_split
 

@@ -1,8 +1,8 @@
 import argparse
 import csv
 
-from experiments.util.datasets import get_valid_datasets, get_dataset, get_pred_type
-from experiments.util.shapley_values import compute_shapley_values
+from experiments.real.datasets import get_valid_datasets, get_dataset, get_pred_type
+from shap import KernelExplainer, PermutationExplainer, SamplingExplainer
 import os
 import numpy as np
 import time
@@ -26,6 +26,24 @@ are saved to [OUT_DIR]/[DATASET_NAME]/shap/[MODEL_NAME].
 Test samples (on which Shapley values were computed, which is a subset of the original test set) 
 are saved to [OUT_DIR]/[DATASET_NAME]/shap/X_test.csv.
 """
+
+
+def compute_shapley_values(pred_fn, X_bg, X, explainer: str):
+    if explainer == "permutation":
+        explainer = PermutationExplainer(pred_fn, X_bg)
+        values = explainer(X).values
+        return values if len(values.shape) == 3 else np.expand_dims(values, -1)
+    elif explainer == "kernel":
+        explainer = KernelExplainer(pred_fn, X_bg)
+        values = explainer.shap_values(X)
+        if type(values) == list:
+            return np.stack(values, axis=-1)
+        else:
+            return np.expand_dims(values, -1)
+    elif explainer == "sampling":
+        explainer = SamplingExplainer(pred_fn, X_bg)
+        values = explainer(X).values
+        return values if len(values.shape) == 3 else np.expand_dims(values, -1)
 
 
 if __name__ == "__main__":

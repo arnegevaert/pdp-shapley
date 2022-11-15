@@ -1,5 +1,5 @@
 from pddshap import FeatureSubsetSelector, FeatureSubset
-from experiments.util.multilinear_polynomial import MultilinearPolynomial
+from experiments.synthetic.multilinear_polynomial import MultilinearPolynomial
 import numpy as np
 
 
