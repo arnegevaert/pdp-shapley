@@ -196,9 +196,7 @@ pip-selfcheck.json
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
 
-data/*
 .idea/*
 tmp/
 out/
 results/
-data

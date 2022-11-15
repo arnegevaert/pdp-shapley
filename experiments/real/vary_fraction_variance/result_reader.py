@@ -95,6 +95,6 @@ class ResultReader:
         for index, row in pdd_df.iterrows():
             # Convert floating point fraction to string representation
             frac = str(row["fraction"]).replace('.', '')
-            result["pddshap"][frac] = {"training": row["training"], "inference": row["inference"]}
+            result["pddshap"][frac] = {"training": row["training"], "inference": row["inference"] / num_rows}
 
         return result

@@ -25,11 +25,11 @@ if __name__ == "__main__":
         print("#"*80)
         runtimes = result_reader.get_runtimes(ds)
 
-        print(f"Permutation: {runtimes['baseline']:.3f} s/row")
+        print(f"Permutation: {runtimes['baseline']:.3e} s/row")
         for key in runtimes["pddshap"]:
             print(f"{key}:")
             for score_fn in ["pearson", "spearman", "r2"]:
                 scores = result_reader.get_score(ds, score_fn)
                 print(f"\t{score_fn}: {np.average(scores[key]):.3f} (median: {np.median(scores[key]):.3f})")
             print(f"\tTraining: {runtimes['pddshap'][key]['training']:.3f}s")
-            print(f"\tInference: {runtimes['pddshap'][key]['inference']:.3f}s/row")
+            print(f"\tInference: {runtimes['pddshap'][key]['inference']:.3e}s/row")

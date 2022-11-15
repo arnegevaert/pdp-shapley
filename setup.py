@@ -14,7 +14,8 @@ setup(
     extras_require={
         "dev": [
             "matplotlib",
-            "shap"
+            "shap",
+            "seaborn"
         ]
     }
 )
