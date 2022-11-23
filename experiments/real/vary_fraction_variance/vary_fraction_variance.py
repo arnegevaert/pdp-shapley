@@ -82,6 +82,7 @@ if __name__ == "__main__":
                 pred_fn = model.predict_proba if pred_type == "classification" else model.predict
 
                 for variance_explained in args.variance_explained:
+                    print(variance_explained)
                     # Create output subdirectory
                     dirname = '1' if variance_explained == 1.0 else str(variance_explained).replace('.', '')
                     print(dirname)

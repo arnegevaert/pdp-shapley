@@ -40,19 +40,27 @@ class PartialDependenceDecomposition:
         self.bg_avg = np.average(self.model(data_np), axis=0)
 
         # Select subsets to be modeled
-        #subset_selector = FeatureSubsetSelector(train_data.to_numpy(), self.model)
-        subset_selector = FeatureSubsetSelector(data_np, self.model)
+        subset_selector = FeatureSubsetSelector(train_data.to_numpy(), self.model)
+        #subset_selector = FeatureSubsetSelector(data_np, self.model)
         max_cardinality = max_cardinality if max_cardinality is not None else data_np.shape[1]
         significant_feature_sets = subset_selector.get_significant_feature_sets(variance_explained, max_cardinality)
 
+        total_sets = 0
+        for card in significant_feature_sets.keys():
+            print(f"Cardinality {card}: {len(significant_feature_sets[card])} subsets")
+            total_sets += len(significant_feature_sets[card])
+
+        prog = tqdm(total=total_sets)
         # Model the subsets in order of increasing cardinality
         for card in significant_feature_sets.keys():
             if card == 0:
                 self.components[FeatureSubset()] = ConstantPDDComponent()
                 self.components[FeatureSubset()].fit(data_np, self.model)
                 self.num_outputs = self.components[FeatureSubset()].num_outputs
+                prog.update()
             else:
                 for feature_set in significant_feature_sets[card]:
+                    prog.update()
                     # All subcomponents are necessary to compute the values for this component
                     subcomponents = {k: v for k, v in self.components.items() if all([feat in feature_set for feat in k])}
                     self.components[feature_set] = PDDComponent(feature_set, self.data_signature,

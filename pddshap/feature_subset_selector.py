@@ -10,6 +10,44 @@ from pddshap import FeatureSubset
 Model = NewType("Model", Callable[[npt.NDArray], npt.NDArray])
 
 
+class COETracker:
+    """
+    Keeps track of CoE values for multiple outputs and which outputs are active
+    TODO Might still be able to use heaps here: re-heapify after an output has been set to inactive.
+        Only useful if linear search operations in this class turn out to be a bottleneck, which is very unlikely
+    """
+    def __init__(self, num_columns, num_outputs):
+        self.num_columns = num_columns
+        self.num_outputs = num_outputs
+        # Maps feature subsets to CoE values for each output
+        self.subset_coe: Dict[FeatureSubset, npt.NDArray] = {}
+        # True if corresponding output is active, False otherwise
+        self.active_outputs = np.array([True for _ in range(num_outputs)])
+
+    def push(self, subset: FeatureSubset, coe_values: npt.NDArray):
+        """
+        Add a feature subset to the data structure
+        """
+        self.subset_coe[subset] = coe_values
+
+    def pop(self) -> FeatureSubset:
+        """
+        Retrieve and remove the feature subset with the largest CoE value among the active outputs
+        """
+        max_subset = None
+        max_coe = 0.
+        for subset in self.subset_coe.keys():
+            coe = np.max(self.subset_coe[subset][self.active_outputs])
+            if coe > max_coe:
+                max_subset = subset
+                max_coe = coe
+        del self.subset_coe[max_subset]
+        return max_subset
+
+    def empty(self) -> bool:
+        return len(self.subset_coe.keys()) == 0
+
+
 class FeatureSubsetSelector:
     """
     Based on Liu et al. 2006: Estimating Mean Dimensionality of Analysis of Variance Decompositions
@@ -48,23 +86,24 @@ class FeatureSubsetSelector:
         variance_explained = np.zeros(self.num_outputs)
         num_columns = self.data.shape[1]
 
-        # Priority queue keeping track of to be modeled components based on their CoE
-        queue = []
+        # Keep track of CoE values for candidate components, while taking into account possible multiple outputs
+        tracker = COETracker(num_columns, self.num_outputs)
 
         # We start with all singleton subsets
         for i in range(num_columns):
-            # The priority value is the largest CoE over all outputs
-            coe = np.min(-self.cost_of_exclusion(FeatureSubset(i)))
-            heapq.heappush(queue, (coe, FeatureSubset(i)))
+            # coe contains CoE for each output
+            coe = self.cost_of_exclusion(FeatureSubset(i))
+            tracker.push(FeatureSubset(i), coe)
 
         # subset_counts contains the number of immediate subsets for each feature set that have been included
         # If all immediate subsets of a feature set are included, then that feature set should be added to the queue
         subset_counts = defaultdict(lambda: 0)
 
         # Add subsets in order of decreasing CoE until the desired fraction of variance has been included
-        while np.any(variance_explained < desired_variance_explained) and len(queue) > 0:
-            # Get the component with largest CoE value, add it to result
-            coe, feature_subset = heapq.heappop(queue)
+        while np.any(tracker.active_outputs) and not tracker.empty():
+            # Pop the next feature subset to be modeled, which is the one having the largest CoE over all active outputs
+            feature_subset = tracker.pop()
+            print(feature_subset)
             if len(feature_subset) <= max_cardinality:
                 result[len(feature_subset)].append(feature_subset)
             # Increment subset_counts for each immediate superset of feature_subset
@@ -74,11 +113,13 @@ class FeatureSubsetSelector:
                     subset_counts[superset] += 1
                     # If all immediate subsets of superset have been included, add superset to queue
                     if subset_counts[superset] == len(superset):
-                        # Ignore CoE values for outputs that have been sufficiently modeled
-                        coe = np.min(-self.cost_of_exclusion(superset)[variance_explained < desired_variance_explained])
-                        heapq.heappush(queue, (coe, superset))
+                        coe = self.cost_of_exclusion(superset)
+                        tracker.push(superset, coe)
             # Increase variance explained
-            variance_explained += self.component_variance(feature_subset, relative=True)
+            variance_explained += np.maximum(self.component_variance(feature_subset, relative=True), 0)
+            print("\t".join([f"{v:.3}" for v in variance_explained]))
+            # Refresh active outputs
+            tracker.active_outputs = variance_explained < desired_variance_explained
         return dict(result)
 
     def cost_of_exclusion(self, feature_set: FeatureSubset, relative=True) -> npt.NDArray:
@@ -112,12 +153,13 @@ class FeatureSubsetSelector:
         orig_output = self._get_model_evaluation(FeatureSubset(*self.all_features))
         shuffled_output = self._get_model_evaluation(feature_set)
         integral = np.average((orig_output * shuffled_output), axis=0)
-        sobol = integral - np.average(orig_output, axis=0)**2
+        # This estimator can have high variance, resulting in negative values. Clamp to 0 in that case.
+        sobol = np.maximum(integral - np.average(orig_output, axis=0)**2, 0)
         if relative:
             return sobol/self.model_variance
         return sobol
 
-    def component_variance(self, feature_set: [FeatureSubset], relative=True) -> npt.NDArray:
+    def component_variance(self, feature_set: FeatureSubset, relative=True) -> npt.NDArray:
         r"""
         Uses the lower Sobol' index and the inclusion-exclusion principle to estimate the variance of a given component
         :param feature_set: The feature set corresponding to the component to be measured
