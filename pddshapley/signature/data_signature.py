@@ -2,7 +2,7 @@ from typing import Tuple, Dict, List, Collection
 import pandas as pd
 from numpy import typing as npt
 import numpy as np
-from pddshap.feature_subset import FeatureSubset
+from .feature_subset import FeatureSubset
 
 
 class DataSignature:

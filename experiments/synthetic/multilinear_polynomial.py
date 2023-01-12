@@ -4,10 +4,11 @@ import itertools
 from typing import Dict, Tuple, List, Union, Callable
 from numpy import typing as npt
 import pandas as pd
-from pddshap import FeatureSubset
+from pddshapley.signature import FeatureSubset
+from pddshapley.util import Model
 
 
-class MultilinearPolynomial:
+class MultilinearPolynomial(Model):
     def __init__(self, num_features: int, coefficients: Dict[FeatureSubset, float]):
         """
         Initialize the multilinear polynomial with a given number of features and coefficients
@@ -55,14 +56,12 @@ class MultilinearPolynomial:
             return self.coefficients[FeatureSubset()]
         return 0.
 
-    def __call__(self, data: npt.NDArray | pd.DataFrame):
+    def __call__(self, data: npt.NDArray):
         """
         Computes the output of the multilinear polynomial for the given input data
         :param data: NDArray, shape: (num_rows, self.num_features)
         :return: NDArray, shape: (num_rows)
         """
-        if type(data) == pd.DataFrame:
-            data = data.to_numpy()
         assert(data.shape[1] == self.num_features)
         output = np.zeros(shape=(data.shape[0]))
         for term in self.coefficients:

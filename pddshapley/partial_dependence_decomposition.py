@@ -1,7 +1,8 @@
-from itertools import combinations
-from typing import Tuple, Callable, Dict, Union, List, Optional
-from pdd-shap import ConstantPDDComponent, PDDComponent, FeatureSubsetSelector, CoordinateGenerator, \
-    FeatureSubset, DataSignature
+from typing import Callable, Dict, Union, Optional
+from pddshapley import ConstantPDDComponent, PDDComponent
+from pddshapley.variance import FeatureSubsetSelector
+from pddshapley.sampling import CoordinateGenerator
+from pddshapley.signature import FeatureSubset, DataSignature
 import numpy as np
 from tqdm import tqdm
 import pandas as pd

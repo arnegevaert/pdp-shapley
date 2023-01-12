@@ -18,14 +18,13 @@ class VarianceEstimator:
     This class is used to estimate variance-based
     properties of feature subsets given a model and a dataset:
         - Lower Sobol' index [REF]
-        - Upper Sobol' index [REF]
         - Cost of exclusion [REF]
         - Component variance 
         (using lower Sobol' and inclusion-exclusion principle)
     """
     def __init__(self, data: npt.NDArray, model: Model,
                  lower_sobol_strategy="lower_bound",
-                 lower_sobol_threshold=0.05) -> None:
+                 lower_sobol_threshold=0.1) -> None:
         r"""
         :param data: an NDArray containing the data to be used to estimate
             properties. Shape: (num_instances, num_features).
@@ -56,7 +55,7 @@ class VarianceEstimator:
         else:
             raise ValueError("Invalid value for lower_sobol_strategy")
         self.lower_sobol_threshold = lower_sobol_threshold
-        self.all_features = np.arange(data.shape[1])
+        self.all_features = FeatureSubset(*np.arange(data.shape[1]))
 
         # Need 2 series of shuffled indices because some Sobol' estimators
         # require 2 random samples instead of 1
@@ -70,9 +69,16 @@ class VarianceEstimator:
         self._model_evaluations: Tuple[
                 Dict[FeatureSubset, npt.NDArray], 
                 Dict[FeatureSubset, npt.NDArray]] = ({}, {})
-        self.orig_output = self._get_model_evaluation(
-                FeatureSubset(*self.all_features))
+
+        # Compute output on original non-shuffled data and center
+        self.orig_output = self.model(data)
+        if len(self.orig_output.shape) == 1:
+            self.orig_output = np.expand_dims(self.orig_output, axis=1)
         self.avg_output = np.average(self.orig_output, axis=0)
+        self.orig_output -= self.avg_output
+        self._model_evaluations[0][self.all_features] = self.orig_output
+        self._model_evaluations[1][self.all_features] = self.orig_output
+
         if len(self.orig_output.shape) == 1:
             self.model_variance = np.var(self.orig_output)
             self.num_outputs = 1
@@ -90,9 +96,9 @@ class VarianceEstimator:
         if feature_set in self.lower_sobol_index_memo:
             return self.lower_sobol_index_memo[feature_set]
         if self.lower_sobol_strategy == "correlation":
-            return self._lower_sobol_index_correlation(feature_set)
+            result = self._lower_sobol_index_correlation(feature_set)
         elif self.lower_sobol_strategy == "oracle":
-            return self._lower_sobol_index_oracle(feature_set)
+            result = self._lower_sobol_index_oracle(feature_set)
         elif self.lower_sobol_strategy == "lower_bound":
             # Estimate a lower bound using the inclusion-exclusion principle
             lower_bound = np.zeros(self.num_outputs)
@@ -109,14 +115,18 @@ class VarianceEstimator:
                         raise SobolNotAvailableException(
                                 FeatureSubset(*subset))
             if np.any(lower_bound < self.lower_sobol_threshold):
-                return self._lower_sobol_index_correlation(feature_set)
-            return self._lower_sobol_index_oracle(feature_set)
+                result = self._lower_sobol_index_correlation(feature_set)
+            else:
+                result = self._lower_sobol_index_oracle(feature_set)
         else:
             # Strategy is rough_estimate
             rough_estimate = self._lower_sobol_index_oracle(feature_set)
             if np.any(rough_estimate < self.lower_sobol_threshold):
-                return self._lower_sobol_index_correlation(feature_set)
-            return rough_estimate
+                result = self._lower_sobol_index_correlation(feature_set)
+            else:
+                result = rough_estimate
+        self.lower_sobol_index_memo[feature_set] = result
+        return np.maximum(result, 0)
 
     def cost_of_exclusion(self, feature_set: FeatureSubset) -> npt.NDArray:
         """
@@ -139,7 +149,7 @@ class VarianceEstimator:
         coe = np.sum(
                 np.power(inner_sum, 2),
                 axis=0) / (self.data.shape[0] * 2**len(feature_set))
-        return coe/self.model_variance
+        return np.maximum(coe/self.model_variance, 0)
 
     def component_variance(self, feature_set: FeatureSubset) -> npt.NDArray:
         r"""
@@ -159,7 +169,7 @@ class VarianceEstimator:
                     result += self.lower_sobol_index(FeatureSubset(*subset))
                 else:
                     result -= self.lower_sobol_index(FeatureSubset(*subset))
-        return result
+        return np.maximum(result, 0)
 
     def _lower_sobol_index_correlation(self, feature_set: FeatureSubset):
         r"""
@@ -175,11 +185,12 @@ class VarianceEstimator:
         """
         # Variable names correspond to the notation in Owen, 2013
         f_x = self.orig_output
-        fs_complement = set(feature_set.features) - set(self.all_features)
+        fs_complement = set(feature_set.features) - set(
+                self.all_features.features)
         f_z_x = self._get_model_evaluation(FeatureSubset(*fs_complement), 
-                                           shuffle_idx=0)
-        f_x_y = self._get_model_evaluation(feature_set, shuffle_idx=1)
-        f_y = self._get_model_evaluation(FeatureSubset(), shuffle_idx=1)
+                                           shuffle_idx=1)
+        f_x_y = self._get_model_evaluation(feature_set, shuffle_idx=0)
+        f_y = self._get_model_evaluation(FeatureSubset(), shuffle_idx=0)
 
         result = np.average((f_x - f_z_x)*(f_x_y - f_y), axis=0)
         return result/self.model_variance
@@ -197,8 +208,10 @@ class VarianceEstimator:
             :math:`\underline{\tau}^2_u`
         """
         shuffled_output = self._get_model_evaluation(feature_set)
-        result = np.average((self.orig_output - self.avg_output) * 
-                            (shuffled_output - self.avg_output),
+        # Note that the outputs given by _get_model_evaluation are already
+        # centered, so we don't need to subtract \mu again
+        result = np.average((self.orig_output) * 
+                            (shuffled_output),
                             axis=0)
         return result/self.model_variance
 
@@ -216,7 +229,8 @@ class VarianceEstimator:
             data = self.data[self.shuffled_indices[shuffle_idx], :]
             keep_idx = list(feature_set)
             data[:, keep_idx] = self.data[:, keep_idx]
-            result = self.model(data)
+            # Centering the data results in better numerical performance
+            result = self.model(data) - self.avg_output
             if len(result.shape) == 1:
                 result = np.expand_dims(result, axis=1)
             self._model_evaluations[shuffle_idx][feature_set] = result

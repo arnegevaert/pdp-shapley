@@ -1,10 +1,10 @@
-from typing import Tuple, Callable, Dict, Optional, Union
-from pddshap import PDDEstimator, ConstantEstimator, TreeEstimator, \
-    ForestEstimator, KNNEstimator, FeatureSubset, DataSignature
+from typing import Callable, Dict, Optional, Union
+from pddshapley import PDDEstimator, ConstantEstimator, TreeEstimator, \
+    ForestEstimator, KNNEstimator
+from pddshapley.signature import FeatureSubset, DataSignature
 import numpy as np
 from numpy import typing as npt
 import pandas as pd
-from numba import njit
 
 
 class PDDComponent:
