@@ -1,13 +1,11 @@
 import numpy as np
-from itertools import combinations, product
-from typing import Callable, NewType, List, Dict
+from itertools import combinations
+from typing import Dict
+from pddshapley.util import Model
 from numpy import typing as npt
 from collections import defaultdict
-import heapq
 
-from pddshap import FeatureSubset
-
-Model = NewType("Model", Callable[[npt.NDArray], npt.NDArray])
+from pddshapley.signature import FeatureSubset
 
 
 class COETracker:
@@ -122,43 +120,6 @@ class FeatureSubsetSelector:
             tracker.active_outputs = variance_explained < desired_variance_explained
         return dict(result)
 
-    def cost_of_exclusion(self, feature_set: FeatureSubset, relative=True) -> npt.NDArray:
-        """
-        Estimates cost of exclusion for a given feature subset.
-        If the model has multiple outputs, returns the maximal CoE value.
-        Based on eq. (11) in Liu et al. 2006.
-        :param feature_set: The feature subset to compute CoE for.
-        :param relative: If true, CoE is returned as a fraction of total variance.
-        :return: Estimated CoE.
-        """
-        inner_sum = np.zeros(shape=(self.data.shape[0], self.num_outputs))
-        for i in range(len(feature_set) + 1):
-            for subset in combinations(feature_set, i):
-                multiplier = 1 if (len(feature_set) - len(subset)) % 2 == 0 else -1
-                inner_sum += multiplier * self._get_model_evaluation(FeatureSubset(*subset))
-        coe = np.sum(np.power(inner_sum, 2), axis=0) / (self.data.shape[0] * 2**len(feature_set))
-        if relative:
-            return coe/self.model_variance
-        return coe
-
-    def lower_sobol_index(self, feature_set: FeatureSubset, relative=True) -> npt.NDArray:
-        r"""
-        Estimates the lower Sobol' index :math:`\underline{\tau}` for a given feature subset.
-        Based on Sobol', 1993: Sensitivity Estimates for Non-Linear Mathematical Models
-
-        :param feature_set: The feature subset to compute :math:`\underline{\tau}` for.
-        :param relative: If true, :math:`\underline{\tau}` is returned as a fraction of total variance.
-        :return: Estimated lower Sobol' index.
-        """
-        orig_output = self._get_model_evaluation(FeatureSubset(*self.all_features))
-        shuffled_output = self._get_model_evaluation(feature_set)
-        integral = np.average((orig_output * shuffled_output), axis=0)
-        # This estimator can have high variance, resulting in negative values. Clamp to 0 in that case.
-        sobol = np.maximum(integral - np.average(orig_output, axis=0)**2, 0)
-        if relative:
-            return sobol/self.model_variance
-        return sobol
-
     def component_variance(self, feature_set: FeatureSubset, relative=True) -> npt.NDArray:
         r"""
         Uses the lower Sobol' index and the inclusion-exclusion principle to estimate the variance of a given component
@@ -172,24 +133,3 @@ class FeatureSubsetSelector:
                 multiplier = 1 if (len(feature_set) - len(subset)) % 2 == 0 else -1
                 result += multiplier * self.lower_sobol_index(FeatureSubset(*subset), relative)
         return result
-
-    def _compute_model_evaluation(self, feature_set: FeatureSubset) -> npt.NDArray:
-        # Shuffle the data for all indices not in feature_set
-        data = self.data[self.shuffled_idx, :]
-        keep_idx = list(feature_set)
-        data[:, keep_idx] = self.data[:, keep_idx]
-        result = self.model(data)
-        if len(result.shape) == 1:
-            result = np.expand_dims(result, axis=1)
-        return result
-
-    def _get_model_evaluation(self, feature_set: FeatureSubset) -> npt.NDArray:
-        """
-        Returns the model evaluated on the full dataset, where the features in feature_set are kept and the others
-        are randomized. This corresponds to $f(x_i^w, z_i^{-w})$ in eq. (11), where $w$ is represented by feature_set.
-        :param feature_set: The features to be kept
-        :return: Model output on partially shuffled data. Shape: (self.data.shape[0], self.num_outputs)
-        """
-        if feature_set not in self._model_evaluations.keys():
-            self._model_evaluations[feature_set] = self._compute_model_evaluation(feature_set)
-        return self._model_evaluations[feature_set]

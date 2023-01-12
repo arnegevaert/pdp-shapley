@@ -3,7 +3,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import OneHotEncoder
-from pddshap.feature_subset import FeatureSubset
+from pddshapley.feature_subset import FeatureSubset
 from typing import Optional, Dict, List
 from numpy import typing as npt
 

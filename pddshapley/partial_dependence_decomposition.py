@@ -1,6 +1,6 @@
 from itertools import combinations
 from typing import Tuple, Callable, Dict, Union, List, Optional
-from pddshap import ConstantPDDComponent, PDDComponent, FeatureSubsetSelector, CoordinateGenerator, \
+from pdd-shap import ConstantPDDComponent, PDDComponent, FeatureSubsetSelector, CoordinateGenerator, \
     FeatureSubset, DataSignature
 import numpy as np
 from tqdm import tqdm
