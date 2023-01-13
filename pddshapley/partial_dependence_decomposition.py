@@ -140,7 +140,8 @@ class PartialDependenceDecomposition:
         prog = tqdm(total=total_sets)
         # First, model the empty component
         # TODO why do we include the empty component in significant_feature_sets?
-        empty_component = ConstantPDDComponent()
+        empty_component = ConstantPDDComponent(FeatureSubset(),
+                                               self.data_signature)
         empty_component.fit(data_np, self.model)
         self.components[FeatureSubset()] = empty_component
         if empty_component.num_outputs is not None:

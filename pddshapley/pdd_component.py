@@ -1,6 +1,6 @@
 from typing import Callable, Dict, Optional, Union
-from pddshapley import PDDEstimator, ConstantEstimator, TreeEstimator, \
-    ForestEstimator, KNNEstimator
+from pddshapley.estimator import KNNPDDEstimator, PDDEstimator, ConstantPDDEstimator, \
+        TreePDDEstimator, ForestPDDEstimator, GaussianProcessPDDEstimator
 from pddshapley.sampling import CollocationMethod
 from pddshapley.signature import FeatureSubset, DataSignature
 import numpy as np
@@ -18,9 +18,10 @@ class PDDComponent:
         self.std = 0
         self.fitted = False
         est_constructors = {
-            "tree": TreeEstimator,
-            "forest": ForestEstimator,
-            "knn": KNNEstimator
+            "tree": TreePDDEstimator,
+            "forest": ForestPDDEstimator,
+            "knn": KNNPDDEstimator,
+            "gp": GaussianProcessPDDEstimator
         }
         self.est_constructor = est_constructors[estimator_type]
         self.collocation_method = collocation_method
@@ -92,17 +93,23 @@ class PDDComponent:
             data = data.to_numpy()
         return self.estimator(self.feature_subset.get_columns(data))
 
-
+# TODO this should be a subclass of PDDComponent, might use this for other
+# components than just the empty set
 class ConstantPDDComponent:
-    def __init__(self):
+    def __init__(self, feature_subset: FeatureSubset,
+                 data_signature: DataSignature):
         self.estimator = None
         self.num_outputs = None
+        self.feature_subset = feature_subset
+        self.data_signature = data_signature
 
     def fit(self, data: np.ndarray, model: Callable[[npt.NDArray], npt.NDArray]):
         output = model(data)
         self.num_outputs = 1 if len(output.shape) == 1 else output.shape[1]
         avg_output = np.average(output, axis=0)
-        self.estimator = ConstantEstimator(avg_output)
+        self.estimator = ConstantPDDEstimator(
+            self.data_signature.get_categories(self.feature_subset),
+            self.feature_subset, avg_output)
 
     def __call__(self, data: np.ndarray):
         if self.estimator is not None:

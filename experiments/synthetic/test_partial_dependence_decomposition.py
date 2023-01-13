@@ -15,7 +15,7 @@ if __name__ == "__main__":
     num_features = 2
     mean = np.zeros(num_features)
     cov = np.diag(np.ones(num_features))
-    X = np.random.multivariate_normal(mean, cov, size=10000).astype(np.float32)
+    X = np.random.multivariate_normal(mean, cov, size=1000).astype(np.float32)
     X_df = pd.DataFrame(X, columns=[f"feat_{i}" for i in range(num_features)])
 
     # Create model and compute ground truth Shapley values
@@ -33,7 +33,8 @@ if __name__ == "__main__":
     decomposition = PartialDependenceDecomposition(
             model, 
             collocation_method=RandomSubsampleCollocation(),
-            estimator_type="knn", est_kwargs={"k": 5})
+            estimator_type="knn", est_kwargs={"k": 3})
+            #estimator_type="gp")
     decomposition.fit(X_train, variance_explained=0.9)
     pdd_values = decomposition.shapley_values(X_test, project=False)
 
