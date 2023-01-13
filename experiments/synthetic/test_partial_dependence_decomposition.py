@@ -1,4 +1,6 @@
-from pddshap import PartialDependenceDecomposition, RandomSubsampleGenerator
+from typing import cast
+from pddshapley import PartialDependenceDecomposition
+from pddshapley.sampling import RandomSubsampleCollocation
 from experiments.util import eval
 import numpy as np
 from experiments.synthetic.multilinear_polynomial import RandomMultilinearPolynomial
@@ -22,11 +24,16 @@ if __name__ == "__main__":
     print(model)
     y = model(X)
     X_train, X_test, y_train, y_test = train_test_split(X_df, y, test_size=0.9)
+    X_train = cast(pd.DataFrame, X_train)
+    X_test = cast(pd.DataFrame, X_test)
+
     true_values = np.expand_dims(model.shapley_values(X_test.to_numpy()), -1)
 
     # Compute Shapley values using PDD-SHAP
-    decomposition = PartialDependenceDecomposition(model, coordinate_generator=RandomSubsampleGenerator(),
-                                                   estimator_type="knn", est_kwargs={"k": 5})
+    decomposition = PartialDependenceDecomposition(
+            model, 
+            collocation_method=RandomSubsampleCollocation(),
+            estimator_type="knn", est_kwargs={"k": 5})
     decomposition.fit(X_train, variance_explained=0.9)
     pdd_values = decomposition.shapley_values(X_test, project=False)
 

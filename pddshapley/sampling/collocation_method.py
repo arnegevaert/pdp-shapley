@@ -4,17 +4,17 @@ from numpy import typing as npt
 from sklearn import cluster
 
 
-class CoordinateGenerator:
+class CollocationMethod:
     @abstractmethod
-    def get_coords(self, data: npt.NDArray):
+    def get_collocation_points(self, data: npt.NDArray):
         raise NotImplementedError
 
 
-class RandomSubsampleGenerator(CoordinateGenerator):
+class RandomSubsampleCollocation(CollocationMethod):
     def __init__(self, frac=1.0):
         self.frac = frac
 
-    def get_coords(self, data: npt.NDArray):
+    def get_collocation_points(self, data: npt.NDArray):
         if self.frac < 1.0:
             indices = np.random.choice(np.arange(data.shape[0]), replace=False,
                                        size=int(data.shape[0] * self.frac))
@@ -25,9 +25,9 @@ class RandomSubsampleGenerator(CoordinateGenerator):
         return data
 
 
-class KMeansGenerator(CoordinateGenerator):
+class KMeansCollocation(CollocationMethod):
     def __init__(self, k: int):
         self.k = k
 
-    def get_coords(self, data: npt.NDArray):
+    def get_collocation_points(self, data: npt.NDArray):
         return cluster.KMeans(n_clusters=self.k).fit(data).cluster_centers_

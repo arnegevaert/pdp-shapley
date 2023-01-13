@@ -1,6 +1,7 @@
 from typing import Callable, Dict, Optional, Union
 from pddshapley import PDDEstimator, ConstantEstimator, TreeEstimator, \
     ForestEstimator, KNNEstimator
+from pddshapley.sampling import CollocationMethod
 from pddshapley.signature import FeatureSubset, DataSignature
 import numpy as np
 from numpy import typing as npt
@@ -9,7 +10,8 @@ import pandas as pd
 
 class PDDComponent:
     def __init__(self, feature_subset: FeatureSubset, data_signature: DataSignature,
-                 coordinate_generator, estimator_type: str, est_kwargs) -> None:
+                 collocation_method: CollocationMethod, estimator_type: str,
+                 est_kwargs: Optional[Dict]) -> None:
         self.data_signature = data_signature
         self.feature_subset = feature_subset
         self.estimator: Optional[PDDEstimator] = None
@@ -21,7 +23,7 @@ class PDDComponent:
             "knn": KNNEstimator
         }
         self.est_constructor = est_constructors[estimator_type]
-        self.coordinate_generator = coordinate_generator
+        self.collocation_method = collocation_method
         self.est_kwargs = est_kwargs
         self.num_outputs = None
 
@@ -56,7 +58,7 @@ class PDDComponent:
         """
 
         # Define coordinates at which we compute the integral
-        coords = self.coordinate_generator.get_coords(self.feature_subset.get_columns(data))
+        coords = self.collocation_method.get_collocation_points(self.feature_subset.get_columns(data))
 
         # For each grid value, get partial dependence and subtract proper subset components
         # Shape: (num_rows, num_outputs)
@@ -86,6 +88,8 @@ class PDDComponent:
         """
         if self.estimator is None:
             raise Exception("PDPComponent is not fitted yet")
+        if isinstance(data, pd.DataFrame):
+            data = data.to_numpy()
         return self.estimator(self.feature_subset.get_columns(data))
 
 
@@ -101,4 +105,6 @@ class ConstantPDDComponent:
         self.estimator = ConstantEstimator(avg_output)
 
     def __call__(self, data: np.ndarray):
-        return self.estimator(data)
+        if self.estimator is not None:
+            return self.estimator(data)
+        raise ValueError("Evaluating component before fit()")

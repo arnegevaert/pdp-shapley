@@ -61,6 +61,8 @@ class ResultReader:
             # Shape: [num_rows, num_outputs]
             result[frac] = np.zeros(shape=(baseline_values.shape[0], baseline_values.shape[2]))
             # TODO this can probably happen more cleanly with some map or apply function
+            # TODO R2 is computed in the wrong way here! Don't do it row by row
+            # TODO see https://scikit-learn.org/stable/modules/generated/sklearn.multioutput.MultiOutputRegressor.html#sklearn.multioutput.MultiOutputRegressor.score
             for i in range(baseline_values.shape[0]):
                 for j in range(baseline_values.shape[2]):
                     result[frac][i, j] = score_fn(pdd_values[frac][i, :, j], baseline_values[i, :, j])
