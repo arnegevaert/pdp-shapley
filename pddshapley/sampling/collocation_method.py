@@ -1,3 +1,9 @@
+"""
+The collocation method is the method used to choose coordinates at which
+to approximate the integral. Note that at each of these collocation points,
+an expected value of the function over some distribution must be computed.
+Basically, the collocation points are the input datapoints for the PDDComponent.
+"""
 from abc import abstractmethod
 import numpy as np
 from numpy import typing as npt

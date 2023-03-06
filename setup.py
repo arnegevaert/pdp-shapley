@@ -16,7 +16,10 @@ setup(
         "dev": [
             "matplotlib",
             "shap",
-            "seaborn"
+            "seaborn",
+            "mypy",
+            "pylint",
+            "black"
         ]
     }
 )

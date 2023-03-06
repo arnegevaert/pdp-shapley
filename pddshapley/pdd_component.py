@@ -1,8 +1,8 @@
 from typing import Callable, Dict, Optional, Union
-from pddshapley.estimator import KNNPDDEstimator, PDDEstimator, ConstantPDDEstimator, \
+from .estimator import KNNPDDEstimator, PDDEstimator, ConstantPDDEstimator, \
         TreePDDEstimator, ForestPDDEstimator, GaussianProcessPDDEstimator
-from pddshapley.sampling import CollocationMethod
-from pddshapley.signature import FeatureSubset, DataSignature
+from .sampling import CollocationMethod, ConditioningMethod
+from .signature import FeatureSubset, DataSignature
 import numpy as np
 from numpy import typing as npt
 import pandas as pd
@@ -10,7 +10,9 @@ import pandas as pd
 
 class PDDComponent:
     def __init__(self, feature_subset: FeatureSubset, data_signature: DataSignature,
-                 collocation_method: CollocationMethod, estimator_type: str,
+                 collocation_method: CollocationMethod,
+                 conditioning_method: ConditioningMethod,
+                 estimator_type: str,
                  est_kwargs: Optional[Dict]) -> None:
         self.data_signature = data_signature
         self.feature_subset = feature_subset
@@ -25,10 +27,11 @@ class PDDComponent:
         }
         self.est_constructor = est_constructors[estimator_type]
         self.collocation_method = collocation_method
+        self.conditioning_method = conditioning_method
         self.est_kwargs = est_kwargs
         self.num_outputs = None
 
-    def _compute_partial_dependence(self, coordinates: npt.NDArray, background_distribution: npt.NDArray,
+    def _compute_partial_dependence(self, coordinates: npt.NDArray,
                                     model: Callable[[npt.NDArray], npt.NDArray]):
         """
         Compute partial dependence of this component at a given point.
@@ -38,17 +41,12 @@ class PDDComponent:
         :param model: The model of which we want to compute the partial dependence
         :return: Partial dependence at x. Shape: (num_outputs,)
         """
-        result = []
-        for row in coordinates:
-            output = model(self.feature_subset.project(background_distribution, row))  # (background_distribution.shape[0], num_outputs)
-            if len(output.shape) == 1:
-                # If there is only 1 output, the dimension must be added
-                output = np.expand_dims(output, axis=-1)
-            result.append(output)
-        result = np.array(result)
-        return np.average(result, axis=1)
+        return np.average(np.array([
+            self.conditioning_method.conditional_expectation(self.feature_subset, row, model)
+            for row in coordinates
+            ]), axis=1)
 
-    def fit(self, data: np.ndarray, model: Callable[[np.ndarray], np.ndarray],
+    def fit(self, data: npt.NDArray, model: Callable[[np.ndarray], np.ndarray],
             subcomponents: Dict[FeatureSubset, Union["PDDComponent", "ConstantPDDComponent"]]):
         """
 
@@ -63,7 +61,7 @@ class PDDComponent:
 
         # For each grid value, get partial dependence and subtract proper subset components
         # Shape: (num_rows, num_outputs)
-        partial_dependence = self._compute_partial_dependence(coords, data, model)
+        partial_dependence = self._compute_partial_dependence(coords, model)
         self.num_outputs = partial_dependence.shape[1]
         for subset, subcomponent in subcomponents.items():
             # Subtract subcomponent from partial dependence
@@ -72,7 +70,7 @@ class PDDComponent:
         # Fit a model on resulting values
         if np.max(partial_dependence) - np.min(partial_dependence) < 1e-5:
             # If the partial dependence is constant, don't fit an estimator
-            self.estimator = ConstantEstimator(partial_dependence[0])
+            self.estimator = ConstantPDDEstimator(partial_dependence[0])
         else:
             # Otherwise, fit a model
             categories = self.data_signature.get_categories(self.feature_subset)
@@ -110,6 +108,7 @@ class ConstantPDDComponent:
         self.estimator = ConstantPDDEstimator(
             self.data_signature.get_categories(self.feature_subset),
             self.feature_subset, avg_output)
+        return avg_output
 
     def __call__(self, data: np.ndarray):
         if self.estimator is not None:
