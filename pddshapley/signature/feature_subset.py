@@ -52,6 +52,9 @@ class FeatureSubset:
     def union(self, other: "FeatureSubset") -> "FeatureSubset":
         return FeatureSubset(*self._features.union(other._features))
 
+    def intersection(self, other: "FeatureSubset") -> "FeatureSubset":
+        return FeatureSubset(*self._features.intersection(other._features))
+
     def __contains__(self, item):
         return item in self._features
 

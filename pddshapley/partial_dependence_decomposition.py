@@ -15,7 +15,7 @@ from tqdm import tqdm
 from . import ConstantPDDComponent, PDDComponent
 from .sampling import CollocationMethod, ConditioningMethod
 from .signature import DataSignature, FeatureSubset
-from .util.model import Model
+from .util import Model, SimplePartialOrdering
 from .variance import COETracker, VarianceEstimator
 
 
@@ -232,7 +232,7 @@ class PartialDependenceDecomposition:
         :return: The output of the decomposition at each coordinate.
         """
         if isinstance(data, pd.DataFrame):
-            data = data.to_numpy()
+            data = data.values
         pdp_values = self.evaluate(data)
         result = np.zeros(shape=(data.shape[0], self.num_outputs))
         for _, values in pdp_values.items():
@@ -250,8 +250,21 @@ class PartialDependenceDecomposition:
             subset: component(data) for subset, component in self.components.items()
         }
 
+    def _asv_coefficients(self, feature_subset: FeatureSubset,
+                          partial_ordering: SimplePartialOrdering):
+        result = []
+        for feature in feature_subset:
+            if partial_ordering.contains_successor(feature, feature_subset):
+                result.append(0)
+            else:
+                incomparables = FeatureSubset(*partial_ordering.get_incomparables(feature))
+                result.append(len(incomparables.intersection(feature_subset)))
+        return np.array(result)
+
+
     def shapley_values(
-        self, data: pd.DataFrame | npt.NDArray, project=False
+        self, data: pd.DataFrame | npt.NDArray, project=False,
+        partial_ordering: Optional[List[List[Union[int, str]]]] = None
     ) -> npt.NDArray:
         """
         Compute Shapley values for each row in data.
@@ -262,16 +275,28 @@ class PartialDependenceDecomposition:
         :return: NDArray containing Shapley values for each row and each output.
             Shape: (num_rows, self.num_features, num_outputs)
         """
+        assert self.data_signature is not None, "Must fit model before computing Shapley values"
         if isinstance(data, pd.DataFrame):
-            data = data.to_numpy()
+            data = data.values
         pdp_values = self.evaluate(data)
+
+        if partial_ordering is not None:
+            simple_partial_ordering = SimplePartialOrdering(
+                partial_ordering, self.data_signature)
 
         result = np.zeros(shape=(data.shape[0], data.shape[1], self.num_outputs))
         for feature_subset, output_vector in pdp_values.items():
             if len(feature_subset) > 0:
                 component_effect = np.expand_dims(output_vector, axis=1)
                 features = feature_subset.features
-                result[:, features, :] += component_effect / len(feature_subset)
+                if partial_ordering is not None:
+                    coef = self._asv_coefficients(feature_subset, simple_partial_ordering)
+                    nonzero_features = np.array(features)[coef != 0]
+                    component_effect = np.tile(component_effect, (1, len(nonzero_features), 1))
+                    result[:, nonzero_features, :] += component_effect / coef[coef != 0].reshape(1, -1, 1)
+                else:
+                    result[:, features, :] += component_effect / len(feature_subset)
+
         if project:
             # Orthogonal projection of Shapley values onto hyperplane
             # x_1 + ... + x_d = c where c is the prediction difference

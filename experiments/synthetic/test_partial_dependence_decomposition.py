@@ -35,13 +35,14 @@ if __name__ == "__main__":
     decomposition = PartialDependenceDecomposition(
             model, 
             collocation_method=RandomSubsampleCollocation(),
-            #conditioning_method=IndependentConditioningMethod(X_train),
+            conditioning_method=IndependentConditioningMethod(X_train),
             #conditioning_method=GaussianConditioningMethod(X_train),
-            conditioning_method=KernelConditioningMethod(X_train.values, sigma_sq=0.1),
+            #conditioning_method=KernelConditioningMethod(X_train.values, sigma_sq=0.1),
             estimator_type="knn", est_kwargs={"k": 3})
             #estimator_type="gp")
     decomposition.fit(X_train, max_size=2)
-    pdd_values = decomposition.shapley_values(X_test, project=False)
+    pdd_values = decomposition.shapley_values(X_test, project=False,
+                                              partial_ordering=[[0], [1]])
 
     eval.print_metrics(pdd_values, true_values, "PDD-SHAP", "Ground truth")
 
