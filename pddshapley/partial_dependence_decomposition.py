@@ -5,6 +5,7 @@ TODO add module docstring
 from collections import defaultdict
 from itertools import combinations
 from typing import Dict, List, Optional, Tuple, Union
+from joblib import Parallel, delayed
 
 import numpy as np
 import pandas as pd
@@ -166,12 +167,13 @@ class PartialDependenceDecomposition:
             assert coe_threshold is not None, "coe_threshold must be set"
         if feature_set_selection == "coe_var_explained":
             assert variance_explained is not None, "variance_explained must be set"
-        data_np = background_data.to_numpy()
-        if max_size is None:
-            max_size = data_np.shape[1]
         self.data_signature = DataSignature(background_data)
+        if isinstance(background_data, pd.DataFrame):
+            background_data = background_data.to_numpy()
+        if max_size is None:
+            max_size = background_data.shape[1]
         if kmeans is not None:
-            data_np = cluster.KMeans(n_clusters=kmeans).fit(data_np).cluster_centers_
+            background_data = cluster.KMeans(n_clusters=kmeans).fit(background_data).cluster_centers_
 
         # Select subsets to be modeled
         # If feature_sets is not None, we use the given feature sets
@@ -182,12 +184,12 @@ class PartialDependenceDecomposition:
                 for i in range(1, max_size + 1):
                     feature_sets += list(
                         FeatureSubset(*comb)
-                        for comb in combinations(range(data_np.shape[1]), i)
+                        for comb in combinations(range(background_data.shape[1]), i)
                     )
             elif feature_set_selection == "coe_threshold" and coe_threshold is not None:
                 # TODO use coe_threshold
                 feature_sets = self._get_significant_feature_sets(
-                    data_np, self.model, variance_explained, max_size
+                    background_data, self.model, variance_explained, max_size
                 )
             elif (
                 feature_set_selection == "coe_var_explained"
@@ -196,34 +198,45 @@ class PartialDependenceDecomposition:
                 # TODO use component_variance to see if we need to model
                 # each component
                 feature_sets = self._get_significant_feature_sets(
-                    data_np, self.model, variance_explained, max_size
+                    background_data, self.model, variance_explained, max_size
                 )
 
         # First, model the empty component
         empty_component = ConstantPDDComponent(FeatureSubset(), self.data_signature)
-        self.bg_avg = empty_component.fit(data_np, self.model)
+        self.bg_avg = empty_component.fit(background_data, self.model)
         self.components[FeatureSubset()] = empty_component
         self.num_outputs = empty_component.num_outputs
 
-        # Model the selected subsets
-        for feature_set in tqdm(feature_sets):
-            # All subcomponents are necessary to compute the values
-            # for this component
-            subcomponents = {
-                k: v
-                for k, v in self.components.items()
-                if all(feat in feature_set for feat in k)
-            }
-            component = PDDComponent(
-                feature_set,
-                self.data_signature,
-                self.collocation_method,
-                self.conditioning_method,
-                self.estimator_type,
-                self.est_kwargs,
-            )
-            component.fit(data_np, self.model, subcomponents)
-            self.components[feature_set] = component
+        # Model the selected subsets in parallel by cardinality
+        fs_size = 1
+        cur_subsets = [fs for fs in feature_sets if len(fs) == fs_size]
+        while len(cur_subsets) > 0:
+            print("Fitting components of size", fs_size, "...")
+            Parallel(n_jobs=-1)(
+                delayed(self._fit_component)(
+                    background_data, fs) for fs in tqdm(cur_subsets))
+            fs_size += 1
+            cur_subsets = [fs for fs in feature_sets if len(fs) == fs_size]
+    
+    def _fit_component(self, background_data: npt.NDArray, feature_set: FeatureSubset):
+        # All subcomponents are necessary to compute the values
+        # for this component
+        subcomponents = {
+            k: v
+            for k, v in self.components.items()
+            if all(feat in feature_set for feat in k)
+        }
+        component = PDDComponent(
+            feature_set,
+            self.data_signature,
+            self.collocation_method,
+            self.conditioning_method,
+            self.estimator_type,
+            self.est_kwargs,
+        )
+        component.fit(background_data, self.model, subcomponents)
+        self.components[feature_set] = component
+
 
     def __call__(self, data: pd.DataFrame | npt.NDArray):
         """

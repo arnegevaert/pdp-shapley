@@ -68,12 +68,12 @@ class PDDComponent:
             partial_dependence -= subcomponent(self.feature_subset.expand_columns(coords, data.shape[1]))
 
         # Fit a model on resulting values
-        if np.max(partial_dependence) - np.min(partial_dependence) < 1e-5:
+        categories = self.data_signature.get_categories(self.feature_subset)
+        if np.max(partial_dependence) - np.min(partial_dependence) < 1e-3:
             # If the partial dependence is constant, don't fit an estimator
-            self.estimator = ConstantPDDEstimator(partial_dependence[0])
+            self.estimator = ConstantPDDEstimator(categories, self.feature_subset, partial_dependence[0])
         else:
             # Otherwise, fit a model
-            categories = self.data_signature.get_categories(self.feature_subset)
             self.estimator = self.est_constructor(categories, self.feature_subset, **self.est_kwargs)
             self.estimator.fit(coords, partial_dependence)
         self.fitted = True

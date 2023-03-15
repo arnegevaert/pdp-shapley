@@ -11,6 +11,7 @@ setup(
         "pandas",
         "scikit-learn",
         "scipy",
+        "tqdm",
     ],
     extras_require={
         "dev": [

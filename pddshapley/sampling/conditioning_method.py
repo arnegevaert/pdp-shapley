@@ -31,10 +31,6 @@ class ConditioningMethod:
                                  value: npt.NDArray,
                                  model: Callable[[npt.NDArray], npt.NDArray],
                                  **kwargs) -> npt.NDArray:
-        """
-        Condition on the given subset of features, and return a sample of the
-        conditional distribution.
-        """
         result = self._conditional_expectation(feature_subset, value, model, **kwargs)
         if len(result.shape) == 1:
             # If there is only 1 output, the dimension must be added
